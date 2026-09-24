@@ -14,12 +14,12 @@ type OrganizationSpec struct {
 	// +kubebuilder:validation:Pattern=`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`
 	OrganizationID string `json:"organizationID"`
 
-	// NameOverride allows overriding the name used in labels.
+	// Name allows overriding the name of the organization.
 	// It must be a valid Kubernetes label value (RFC 1123/6399).
 	// +optional
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern=`^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$`
-	NameOverride string `json:"nameOverride,omitempty"`
+	Name string `json:"name,omitempty"`
 }
 
 // OrganizationStatus defines the observed state of Organization.
@@ -33,13 +33,17 @@ type OrganizationStatus struct {
 	// ObservedGeneration reflects the generation of the most recently observed Organization.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// DisplayName is the effective name of the organization (either the override or the metadata name).
+	// +optional
+	DisplayName string `json:"displayName,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Namespaced
 // +kubebuilder:printcolumn:name="OrganizationID",type=string,JSONPath=`.spec.organizationID`
-// +kubebuilder:printcolumn:name="Override",type=string,JSONPath=`.spec.nameOverride`
+// +kubebuilder:printcolumn:name="Display Name",type=string,JSONPath=`.status.displayName`
 // +kubebuilder:printcolumn:name="Bound",type=string,JSONPath=`.status.conditions[?(@.type=="Bound")].status`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 

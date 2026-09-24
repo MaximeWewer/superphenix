@@ -3,10 +3,11 @@ package project
 import (
 	"context"
 	"fmt"
-	"slices"
 	"strings"
+	"time"
 
 	argov1alpha1 "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
+	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -111,6 +112,21 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
+	// Check if Project is Bound
+	boundCond := meta.FindStatusCondition(proj.Status.Conditions, operatorv1alpha1.ConditionTypeBound)
+	if boundCond == nil || boundCond.Status != metav1.ConditionTrue {
+		log.Info("Project is not bound to the database, skipping business logic", "name", proj.Name)
+		proj.Status.ObservedGeneration = proj.Generation
+		proj.Status.DisplayName = proj.Name
+		if proj.Spec.Name != "" {
+			proj.Status.DisplayName = proj.Spec.Name
+		}
+		if err := r.Status().Update(ctx, proj); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
 	// Reconcile GitOps
 	if err := r.reconcileGitOps(ctx, proj); err != nil {
 		log.Error(err, "Failed to reconcile GitOps")
@@ -118,6 +134,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	proj.Status.ObservedGeneration = proj.Generation
+	proj.Status.DisplayName = proj.Name
+	if proj.Spec.Name != "" {
+		proj.Status.DisplayName = proj.Spec.Name
+	}
 	if err := r.Status().Update(ctx, proj); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -134,24 +154,19 @@ func (r *Reconciler) reconcileFinalizers(ctx context.Context, proj *operatorv1al
 			projectSPXID := spxId.ToSPXID(proj.Spec.ProjectID)
 			appName := fmt.Sprintf("gitops-%s", projectSPXID)
 
-			app := &argov1alpha1.Application{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      appName,
-					Namespace: projectSPXID,
-				},
-			}
-			if err := r.Delete(ctx, app); err != nil && !apierrors.IsNotFound(err) {
-				log.Error(err, "Failed to delete ArgoCD Application", "name", appName)
-				return true, ctrl.Result{}, err
-			}
-
-			ns := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: projectSPXID,
-				},
-			}
-			if err := r.Delete(ctx, ns); err != nil && !apierrors.IsNotFound(err) {
-				log.Error(err, "Failed to delete project namespace", "name", projectSPXID)
+			app := &argov1alpha1.Application{}
+			err := r.Get(ctx, types.NamespacedName{Name: appName, Namespace: projectSPXID}, app)
+			if err == nil {
+				if app.DeletionTimestamp.IsZero() {
+					log.Info("Deleting ArgoCD Application", "name", appName)
+					if err := r.Delete(ctx, app); err != nil {
+						return true, ctrl.Result{}, err
+					}
+				}
+				log.Info("Waiting for ArgoCD Application to be deleted", "name", appName)
+				return true, ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+			} else if !apierrors.IsNotFound(err) {
+				log.Error(err, "Failed to check ArgoCD Application existence", "name", appName)
 				return true, ctrl.Result{}, err
 			}
 
@@ -168,7 +183,7 @@ func (r *Reconciler) reconcileFinalizers(ctx context.Context, proj *operatorv1al
 		if err := r.Update(ctx, proj); err != nil {
 			return true, ctrl.Result{}, err
 		}
-		return true, ctrl.Result{}, nil
+		return false, ctrl.Result{}, nil
 	}
 
 	return false, ctrl.Result{}, nil
@@ -191,18 +206,44 @@ func (r *Reconciler) reconcileOrganization(ctx context.Context, proj *operatorv1
 				Message:            "Referenced Organization not found",
 				ObservedGeneration: proj.Generation,
 			})
+			proj.Status.DisplayName = proj.Name
+			if proj.Spec.Name != "" {
+				proj.Status.DisplayName = proj.Spec.Name
+			}
 			if err := r.Status().Update(ctx, proj); err != nil {
 				return true, ctrl.Result{}, err
 			}
-			return true, ctrl.Result{}, nil
+			return true, ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 		}
 		return true, ctrl.Result{}, err
 	}
+
+	// Check if Organization is Bound
+	boundCond := meta.FindStatusCondition(org.Status.Conditions, operatorv1alpha1.ConditionTypeBound)
+	if boundCond == nil || boundCond.Status != metav1.ConditionTrue {
+		log.Info("Referenced Organization is not bound to the database", "organization", org.Name)
+		meta.SetStatusCondition(&proj.Status.Conditions, metav1.Condition{
+			Type:               operatorv1alpha1.ConditionTypeBound,
+			Status:             metav1.ConditionFalse,
+			Reason:             "OrganizationNotBound",
+			Message:            "Referenced Organization is not bound to the database",
+			ObservedGeneration: proj.Generation,
+		})
+		proj.Status.DisplayName = proj.Name
+		if proj.Spec.Name != "" {
+			proj.Status.DisplayName = proj.Spec.Name
+		}
+		if err := r.Status().Update(ctx, proj); err != nil {
+			return true, ctrl.Result{}, err
+		}
+		return true, ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
 	return false, ctrl.Result{}, nil
 }
 
 func (r *Reconciler) reconcileAvailabilityZones(ctx context.Context, proj *operatorv1alpha1.Project) error {
-	var availableZones []string
+	var availableZones []operatorv1alpha1.AvailableZoneStatus
 	var invalidZones []string
 	var notFoundZones []string
 
@@ -231,8 +272,18 @@ func (r *Reconciler) reconcileAvailabilityZones(ctx context.Context, proj *opera
 
 		if isValid {
 			azName := fmt.Sprintf("%s-%s", cluster.Spec.Region, cluster.Spec.AvailabilityZone)
-			if !slices.Contains(availableZones, azName) {
-				availableZones = append(availableZones, azName)
+			found := false
+			for _, az := range availableZones {
+				if az.Name == azName {
+					found = true
+					break
+				}
+			}
+			if !found {
+				availableZones = append(availableZones, operatorv1alpha1.AvailableZoneStatus{
+					Name:        azName,
+					ClusterName: cluster.Name,
+				})
 			}
 		} else {
 			invalidZones = append(invalidZones, azRef.Name)
@@ -240,6 +291,7 @@ func (r *Reconciler) reconcileAvailabilityZones(ctx context.Context, proj *opera
 	}
 
 	proj.Status.AvailableZones = availableZones
+	proj.Status.AvailableAZsCount = len(availableZones)
 
 	if len(invalidZones) > 0 || len(notFoundZones) > 0 {
 		var messages []string
@@ -276,10 +328,12 @@ func (r *Reconciler) reconcileDatabaseBinding(ctx context.Context, proj *operato
 
 	if db.Client != nil {
 		found, err := db.ProjectExists(proj.Spec.ProjectID)
-		if err == nil && found {
-			status = metav1.ConditionTrue
-			reason = operatorv1alpha1.ReasonBoundFound
-			message = "Project is bound to the Superphenix Database"
+		if err == nil {
+			if found {
+				status = metav1.ConditionTrue
+				reason = operatorv1alpha1.ReasonBoundFound
+				message = "Project is bound to the Superphenix Database"
+			}
 		} else if err != nil {
 			return err
 		}
@@ -302,7 +356,53 @@ func (r *Reconciler) reconcileGitOps(ctx context.Context, proj *operatorv1alpha1
 	namespaceName := projectSPXID
 	appName := fmt.Sprintf("gitops-%s", projectSPXID)
 
+	// Fetch referenced Organization to get names and IDs
+	org, err := r.fetchOrganizationForProject(ctx, proj)
+	if err != nil {
+		return err
+	}
+
+	organizationName := org.Spec.Name
+	if organizationName == "" {
+		organizationName = org.Name
+	}
+
+	projectName := proj.Spec.Name
+	if projectName == "" {
+		projectName = proj.Name
+	}
+
 	// Ensure Namespace exists
+	if err := r.ensureNamespace(ctx, namespaceName, org.Spec.OrganizationID, proj.Spec.ProjectID); err != nil {
+		return err
+	}
+
+	// Determine GitOps parameters
+	repoURL, path, targetRevision := r.resolveManifestLocation(proj)
+
+	// Build Helm values
+	helmValues, err := r.buildHelmValues(proj, org, organizationName, projectName)
+	if err != nil {
+		return fmt.Errorf("failed to build helm values: %w", err)
+	}
+
+	// Ensure ArgoCD Application exists
+	return r.ensureArgoApplication(ctx, proj, namespaceName, appName, repoURL, path, targetRevision, helmValues)
+}
+
+func (r *Reconciler) fetchOrganizationForProject(ctx context.Context, proj *operatorv1alpha1.Project) (*operatorv1alpha1.Organization, error) {
+	orgNamespace := proj.Spec.OrganizationRef.Namespace
+	if orgNamespace == "" {
+		orgNamespace = proj.Namespace
+	}
+	org := &operatorv1alpha1.Organization{}
+	if err := r.Get(ctx, types.NamespacedName{Name: proj.Spec.OrganizationRef.Name, Namespace: orgNamespace}, org); err != nil {
+		return nil, fmt.Errorf("failed to fetch organization %s: %w", proj.Spec.OrganizationRef.Name, err)
+	}
+	return org, nil
+}
+
+func (r *Reconciler) ensureNamespace(ctx context.Context, namespaceName, organizationID, projectID string) error {
 	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: namespaceName,
@@ -313,14 +413,17 @@ func (r *Reconciler) reconcileGitOps(ctx context.Context, proj *operatorv1alpha1
 			ns.Labels = make(map[string]string)
 		}
 		ns.Labels["operator.superphenix.net/managed"] = "true"
-		ns.Labels["operator.superphenix.net/project-id"] = proj.Spec.ProjectID
+		ns.Labels[spxId.SpxLabelOrganizationID] = spxId.ToSPXID(organizationID)
+		ns.Labels[spxId.SpxLabelProjectID] = spxId.ToSPXID(projectID)
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("failed to reconcile namespace %s: %w", namespaceName, err)
 	}
+	return nil
+}
 
-	// Determine GitOps parameters
+func (r *Reconciler) resolveManifestLocation(proj *operatorv1alpha1.Project) (string, string, string) {
 	repoURL := r.GitOpsConfig.RepoURL
 	path := r.GitOpsConfig.Path
 	targetRevision := r.GitOpsConfig.TargetRevision
@@ -336,8 +439,103 @@ func (r *Reconciler) reconcileGitOps(ctx context.Context, proj *operatorv1alpha1
 			targetRevision = proj.Spec.GitOps.ManifestLocation.TargetRevision
 		}
 	}
+	return repoURL, path, targetRevision
+}
 
-	// Ensure ArgoCD Application exists in that namespace
+func (r *Reconciler) buildHelmValues(proj *operatorv1alpha1.Project, org *operatorv1alpha1.Organization, organizationName, projectName string) (string, error) {
+	type azValue struct {
+		Name    string `yaml:"name"`
+		Cluster string `yaml:"cluster"`
+	}
+
+	type credentialsValues struct {
+		Username           string `yaml:"username,omitempty"`
+		Password           string `yaml:"password,omitempty"`
+		Insecure           bool   `yaml:"insecure,omitempty"`
+		ForceHttpBasicAuth bool   `yaml:"forceHttpBasicAuth,omitempty"`
+		EnableLfs          bool   `yaml:"enableLfs,omitempty"`
+		SshPrivateKey      string `yaml:"sshPrivateKey,omitempty"`
+	}
+
+	type valuesLocationValues struct {
+		RepoURL        string            `yaml:"repoURL"`
+		Path           string            `yaml:"path"`
+		TargetRevision string            `yaml:"targetRevision"`
+		Credentials    credentialsValues `yaml:"credentials"`
+	}
+
+	type gitopsValues struct {
+		ValuesLocation valuesLocationValues `yaml:"valuesLocation"`
+	}
+
+	type projectValues struct {
+		ProjectID         string       `yaml:"projectID"`
+		Name              string       `yaml:"name"`
+		AvailabilityZones []azValue    `yaml:"availabilityZones"`
+		GitOps            gitopsValues `yaml:"gitops"`
+	}
+
+	type organizationValues struct {
+		OrganizationID string `yaml:"organizationID"`
+		Name           string `yaml:"name"`
+	}
+
+	type helmValues struct {
+		Organization organizationValues `yaml:"organization"`
+		Project      projectValues      `yaml:"project"`
+	}
+
+	// Collect AZ details
+	var azs []azValue
+	for _, az := range proj.Status.AvailableZones {
+		azs = append(azs, azValue{
+			Name:    az.Name,
+			Cluster: az.ClusterName,
+		})
+	}
+
+	// GitOps parameters
+	valuesLoc := valuesLocationValues{}
+	if proj.Spec.GitOps != nil && proj.Spec.GitOps.ValuesLocation != nil {
+		vl := proj.Spec.GitOps.ValuesLocation
+		valuesLoc.RepoURL = vl.RepoURL
+		valuesLoc.Path = vl.Path
+		valuesLoc.TargetRevision = vl.TargetRevision
+		if vl.Credentials != nil {
+			valuesLoc.Credentials = credentialsValues{
+				Username:           vl.Credentials.Username,
+				Password:           vl.Credentials.Password,
+				Insecure:           vl.Credentials.Insecure,
+				ForceHttpBasicAuth: vl.Credentials.ForceHttpBasicAuth,
+				EnableLfs:          vl.Credentials.EnableLfs,
+				SshPrivateKey:      vl.Credentials.SshPrivateKey,
+			}
+		}
+	}
+
+	values := helmValues{
+		Organization: organizationValues{
+			OrganizationID: org.Spec.OrganizationID,
+			Name:           organizationName,
+		},
+		Project: projectValues{
+			ProjectID:         proj.Spec.ProjectID,
+			Name:              projectName,
+			AvailabilityZones: azs,
+			GitOps: gitopsValues{
+				ValuesLocation: valuesLoc,
+			},
+		},
+	}
+
+	data, err := yaml.Marshal(values)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func (r *Reconciler) ensureArgoApplication(ctx context.Context, proj *operatorv1alpha1.Project, namespaceName, appName, repoURL, path, targetRevision, helmValues string) error {
 	app := &argov1alpha1.Application{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      appName,
@@ -345,24 +543,30 @@ func (r *Reconciler) reconcileGitOps(ctx context.Context, proj *operatorv1alpha1
 		},
 	}
 
-	_, err = controllerutil.CreateOrUpdate(ctx, r.Client, app, func() error {
+	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, app, func() error {
 		if app.Labels == nil {
 			app.Labels = make(map[string]string)
 		}
 		app.Labels["operator.superphenix.net/managed"] = "true"
 
-		// Note: Standard owner references don't work across namespaces.
-		// We handle cleanup in the project finalizer.
+		// Add ArgoCD resources finalizer to ensure child resources are cleaned up
+		// Unsure if we want to do it for now, this can end up being dangerous
+		// controllerutil.AddFinalizer(app, "resources-finalizer.argocd.argoproj.io")
 
 		app.Spec.Source = &argov1alpha1.ApplicationSource{
 			RepoURL:        repoURL,
 			Path:           path,
 			TargetRevision: targetRevision,
+			Helm: &argov1alpha1.ApplicationSourceHelm{
+				Values: helmValues,
+			},
 		}
+
 		app.Spec.Destination = argov1alpha1.ApplicationDestination{
-			Server:    "https://kubernetes.default.svc",
+			Name:      "in-cluster",
 			Namespace: namespaceName,
 		}
+
 		app.Spec.Project = "default"
 		app.Spec.SyncPolicy = &argov1alpha1.SyncPolicy{
 			Automated: &argov1alpha1.SyncPolicyAutomated{

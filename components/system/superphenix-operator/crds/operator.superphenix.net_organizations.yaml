@@ -18,8 +18,8 @@ spec:
     - jsonPath: .spec.organizationID
       name: OrganizationID
       type: string
-    - jsonPath: .spec.nameOverride
-      name: Override
+    - jsonPath: .status.displayName
+      name: Display Name
       type: string
     - jsonPath: .status.conditions[?(@.type=="Bound")].status
       name: Bound
@@ -53,9 +53,9 @@ spec:
           spec:
             description: Spec defines the desired state of Organization.
             properties:
-              nameOverride:
+              name:
                 description: |-
-                  NameOverride allows overriding the name used in labels.
+                  Name allows overriding the name of the organization.
                   It must be a valid Kubernetes label value (RFC 1123/6399).
                 maxLength: 63
                 pattern: ^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$
@@ -133,6 +133,10 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              displayName:
+                description: DisplayName is the effective name of the organization
+                  (either the override or the metadata name).
+                type: string
               observedGeneration:
                 description: ObservedGeneration reflects the generation of the most
                   recently observed Organization.

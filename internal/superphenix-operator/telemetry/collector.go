@@ -25,9 +25,6 @@ type Collector struct {
 	OperatorVersion string
 	Namespace       string
 
-	// SystemVersion is the version of the Superphenix system.
-	SystemVersion string
-
 	// ArgoCDVersion is the currently deployed argocd chart version on
 	// this cluster (in management mode).
 	ArgoCDVersion string
@@ -60,19 +57,6 @@ func (c *Collector) Collect(ctx context.Context) (Report, error) {
 			Labels: map[string]string{
 				"name":    "argocd",
 				"version": sanitizeVersion(c.ArgoCDVersion),
-			},
-		})
-	}
-
-	if c.SystemVersion != "" {
-		report.Metrics = append(report.Metrics, Metric{
-			Name:  MetricComponentInfo,
-			Kind:  KindGauge,
-			Value: 1,
-			Labels: map[string]string{
-				"name":       "management",
-				"version":    sanitizeVersion(c.SystemVersion),
-				"management": "true",
 			},
 		})
 	}
@@ -120,7 +104,6 @@ func (c *Collector) Collect(ctx context.Context) (Report, error) {
 			Value: 1,
 			Labels: map[string]string{
 				"cluster":  anon.Hash(string(cl.UID)),
-				"region":   anon.Hash(cl.Spec.Region),
 				"az":       anon.Hash(cl.Spec.AvailabilityZone),
 				"topology": topologyLabel(cl.Spec.DeploymentTopology),
 				"type":     typeLabel(cl.Spec.DeploymentTopology, cl.Spec.Type),

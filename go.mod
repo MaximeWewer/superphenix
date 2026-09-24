@@ -4,16 +4,23 @@ go 1.25.7
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
+	github.com/argoproj/argo-cd/v3 v3.2.1
 	github.com/go-logr/logr v1.4.3
+	github.com/google/uuid v1.6.1-0.20241114170450-2d3c2a9cc518
+	github.com/klauspost/compress v1.18.2
 	github.com/onsi/ginkgo/v2 v2.27.3
 	github.com/onsi/gomega v1.38.3
 	github.com/rs/zerolog v1.35.1
+	github.com/stmcginnis/gofish v0.23.0
 	github.com/stretchr/testify v1.11.1
 	github.com/super-phenix/superphenix-telemetry v0.0.0-20260705081709-439fee9fefc6
 	github.com/super-phenix/superphenix/internal/superphenix-api v0.0.0
 	github.com/super-phenix/superphenix/internal/superphenix-controller v0.0.0
 	github.com/super-phenix/superphenix/pkg/superphenix-id v0.0.0
 	github.com/super-phenix/superphenix/pkg/utils v0.0.0
+	gopkg.in/yaml.v3 v3.0.1
+	gorm.io/driver/postgres v1.6.0
+	gorm.io/gorm v1.31.1
 	helm.sh/helm/v3 v3.17.1
 	k8s.io/api v0.35.0
 	k8s.io/apiextensions-apiserver v0.35.0
@@ -93,7 +100,6 @@ require (
 	github.com/Permify/permify-go v0.4.9 // indirect
 	github.com/ProtonMail/go-crypto v1.1.6 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
-	github.com/argoproj/argo-cd/v3 v3.2.1 // indirect
 	github.com/argoproj/gitops-engine v0.7.1-0.20251108235403-13d5172d3ee2 // indirect
 	github.com/argoproj/pkg v0.13.6 // indirect
 	github.com/argoproj/pkg/v2 v2.0.1 // indirect
@@ -114,6 +120,7 @@ require (
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v0.2.1 // indirect
+	github.com/csi-addons/kubernetes-csi-addons v0.13.0 // indirect
 	github.com/cyphar/filepath-securejoin v0.4.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
@@ -182,7 +189,6 @@ require (
 	github.com/google/go-github/v72 v72.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/pprof v0.0.0-20251114195745-4902fdda35c8 // indirect
-	github.com/google/uuid v1.6.1-0.20241114170450-2d3c2a9cc518 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/gosuri/uitable v0.0.4 // indirect
@@ -205,7 +211,7 @@ require (
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.7 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
-	github.com/klauspost/compress v1.18.2 // indirect
+	github.com/kube-object-storage/lib-bucket-provisioner v0.0.0-20260420161730-5164e3746489 // indirect
 	github.com/kubeovn/kube-ovn v1.15.1 // indirect
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.2.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
@@ -262,7 +268,6 @@ require (
 	github.com/spf13/cobra v1.10.2 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/spf13/viper v1.21.0 // indirect
-	github.com/stmcginnis/gofish v0.23.0 // indirect
 	github.com/stoewer/go-strcase v1.3.1 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/super-phenix/superphenix/pkg/chi-helper v0.0.0 // indirect
@@ -315,9 +320,6 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
-	gorm.io/driver/postgres v1.6.0 // indirect
-	gorm.io/gorm v1.31.1 // indirect
 	k8s.io/apiserver v0.35.0 // indirect
 	k8s.io/cli-runtime v0.34.3 // indirect
 	k8s.io/component-base v0.35.0 // indirect

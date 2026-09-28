@@ -226,6 +226,11 @@ func createSubnet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = body.CreateSubnet(r.Context())
+	if errors.IsNotFound(err) {
+		log.Warn().Err(err).Str("vpc", body.General.VpcEId).Msg("VPC not found in project")
+		httpError.Http(w, r, http.StatusNotFound).Msg("VPC not found")
+		return
+	}
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create subnet")
 		httpError.Http(w, r, http.StatusInternalServerError).Msg("Failed to create subnet")

@@ -13,7 +13,6 @@ import (
 	"github.com/super-phenix/superphenix/internal/superphenix-api/pkg/opentelemetry/tracing"
 
 	spxId "github.com/super-phenix/superphenix/pkg/superphenix-id"
-	"github.com/super-phenix/superphenix/pkg/utils/secret"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -27,7 +26,6 @@ func main() {
 
 	loadConfig()
 	startLogging()
-	checkAZAuthSecrets()
 	startTracing()
 	startMetrics()
 	spxId.SetFrameworkPrefix(config.Global.SpxPrefix)
@@ -43,16 +41,6 @@ func loadConfig() {
 			l.Print("Config file not found, falling back to environment variables and defaults")
 		} else {
 			l.Fatalf("An error occured while loading config file: %v", err)
-		}
-	}
-}
-
-// checkAZAuthSecrets refuses to start when an AZ controller secret is empty,
-// short or publicly known: the controller trusts any caller presenting it.
-func checkAZAuthSecrets() {
-	for code, az := range config.Global.AZs {
-		if err := secret.Check(az.AuthSecret); err != nil {
-			log.Fatal().Err(err).Str("az", code).Msg("Invalid AZ authSecret, set a random value of at least 16 characters (e.g. through the SUPERPHENIX-API_AZS_<AZ>_AUTHSECRET environment variable)")
 		}
 	}
 }

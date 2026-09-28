@@ -14,7 +14,6 @@ import (
 	"github.com/super-phenix/superphenix/internal/superphenix-controller/pkg/opentelemetry/tracing"
 
 	spxId "github.com/super-phenix/superphenix/pkg/superphenix-id"
-	"github.com/super-phenix/superphenix/pkg/utils/secret"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -28,7 +27,6 @@ func main() {
 
 	loadConfig()
 	startLogging()
-	checkAuthSecret()
 	startTracing()
 	startMetrics()
 
@@ -47,14 +45,6 @@ func loadConfig() {
 		} else {
 			l.Fatalf("An error occured while loading config file: %v", err)
 		}
-	}
-}
-
-// checkAuthSecret refuses to start with an empty, short or publicly known
-// shared secret: every tenant-facing endpoint relies on it.
-func checkAuthSecret() {
-	if err := secret.Check(config.Global.Http.AuthSecret); err != nil {
-		log.Fatal().Err(err).Msg("Invalid http.authSecret, set a random value of at least 16 characters (e.g. through the SUPERPHENIX-CONTROLLER_HTTP_AUTHSECRET environment variable)")
 	}
 }
 

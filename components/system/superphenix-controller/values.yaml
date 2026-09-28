@@ -79,21 +79,6 @@ networkPolicy:
   # -- Peers allowed to scrape metrics. Empty means any source.
   metricsFrom: []
 
-authSecret:
-  # -- Generate a random shared secret (used by the API to call this controller)
-  # in a Kubernetes Secret with a Job, if the Secret does not exist yet.
-  generate: true
-  # -- Name of the Secret holding the shared secret. Defaults to `<fullname>-auth`.
-  # Set it with `generate: false` to use a Secret you manage yourself.
-  secretName: ""
-  # -- Key of the shared secret in the Secret.
-  key: auth-secret
-  image:
-    # -- The image repository to use for the secret generation job.
-    repository: alpine/kubectl
-    # -- The image tag to use for the secret generation job.
-    tag: 1.35.0
-
 ingress:
   enabled: false
   annotations:

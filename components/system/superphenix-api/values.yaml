@@ -97,15 +97,6 @@ serviceMonitor:
 # `config.productsConfig.argoApp.{kubernetes,backup}`.
 config: {}
 
-# -- Controller shared secrets read from Kubernetes Secrets, one entry per AZ.
-# Each entry overrides `config.azs.<az>.authSecret`, which must still be declared
-# (an empty string is fine). Example:
-#   azAuthSecrets:
-#     - az: local
-#       secretName: superphenix-controller-auth
-#       key: auth-secret   # optional, defaults to auth-secret
-azAuthSecrets: []
-
 jwtSecret:
   # -- Whether to generate a random JWT secret using a Kubernetes Job.
   generate: true

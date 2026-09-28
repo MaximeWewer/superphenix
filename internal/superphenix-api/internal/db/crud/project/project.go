@@ -13,6 +13,7 @@ import (
 	logger "github.com/super-phenix/superphenix/pkg/utils/log"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 func FindAllByOrgaId(orgaId string) ([]model.Project, error) {
@@ -31,9 +32,34 @@ func FindById(projectId string) (httpModel.APIProject, error) {
 	})
 }
 
-func DeleteById(projectId uuid.UUID) error {
-	result := db.Client.Delete(&model.Project{}, projectId)
-	return result.Error
+// DeleteById deletes the project only when it belongs to the given
+// organization. It returns gorm.ErrRecordNotFound when no row matches.
+func DeleteById(projectId, orgaId uuid.UUID) error {
+	result := db.Client.
+		Where("id = ? AND orga_id = ?", projectId, orgaId).
+		Delete(&model.Project{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+// FindByIdAndOrgaId returns the project only when it belongs to the given
+// organization. It is the authorization guard used before any destructive
+// operation on a project, so that a project of another organization cannot be
+// addressed by id alone.
+//
+// The query is explicit on purpose: GORM struct conditions drop zero-value
+// fields, so a nil id would otherwise match any project of the organization.
+func FindByIdAndOrgaId(projectId, orgaId uuid.UUID) (model.Project, error) {
+	var p model.Project
+	err := db.Client.
+		Where("id = ? AND orga_id = ?", projectId, orgaId).
+		First(&p).Error
+	return p, err
 }
 
 // CreateProject create a new project into the database

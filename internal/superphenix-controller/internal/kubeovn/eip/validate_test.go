@@ -194,3 +194,48 @@ func TestUpdateEip_InternalIPOutsideSubnet(t *testing.T) {
 		t.Errorf("no FIP must be created, found %d", len(fips.Items))
 	}
 }
+
+// TestCreateEip_ValidatesOnlyTheAppliedMode checks that only the targets of
+// the applied mode are validated: SNAT/DNAT are ignored in FIP mode, but a bad
+// DNAT is still refused in SNAT mode.
+func TestCreateEip_ValidatesOnlyTheAppliedMode(t *testing.T) {
+	badDNAT := struct {
+		ExternalPort string `json:"externalPort"`
+		InternalIP   string `json:"internalIP"`
+		InternalPort string `json:"internalPort"`
+		Protocol     string `json:"protocol"`
+	}{ExternalPort: "22", InternalIP: "10.20.0.9", InternalPort: "22", Protocol: "tcp"}
+
+	t.Run("FIP mode ignores out-of-subnet SNAT and DNAT", func(t *testing.T) {
+		fakeSubnets()
+
+		info := newCreateInfo(ownSubnet, "10.10.0.5")
+		info.Spec.SNAT = []string{"0.0.0.0/0"}
+		info.Spec.DNAT = append(info.Spec.DNAT, badDNAT)
+
+		if err := info.CreateEip(context.Background()); err != nil {
+			t.Fatalf("CreateEip() error = %v", err)
+		}
+		fips, _ := config.KubeOvnClient.KubeovnV1().IptablesFIPRules().List(context.Background(), metav1.ListOptions{})
+		dnats, _ := config.KubeOvnClient.KubeovnV1().IptablesDnatRules().List(context.Background(), metav1.ListOptions{})
+		if len(fips.Items) != 1 || len(dnats.Items) != 0 {
+			t.Errorf("expected 1 FIP and no DNAT, found %d FIP and %d DNAT", len(fips.Items), len(dnats.Items))
+		}
+	})
+
+	t.Run("SNAT mode refuses an out-of-subnet DNAT before creating anything", func(t *testing.T) {
+		fakeSubnets()
+
+		info := newCreateInfo(ownSubnet, "")
+		info.Spec.SNAT = []string{"10.10.0.0/24"}
+		info.Spec.DNAT = append(info.Spec.DNAT, badDNAT)
+
+		if err := info.CreateEip(context.Background()); !apierrors.IsBadRequest(err) {
+			t.Fatalf("expected a BadRequest error, got %v", err)
+		}
+		eips, _ := config.KubeOvnClient.KubeovnV1().IptablesEIPs().List(context.Background(), metav1.ListOptions{})
+		if len(eips.Items) != 0 {
+			t.Errorf("no EIP must be created, found %d", len(eips.Items))
+		}
+	})
+}

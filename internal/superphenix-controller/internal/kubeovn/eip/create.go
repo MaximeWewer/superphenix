@@ -57,11 +57,20 @@ func (s *CreateEIPInfo) CreateEip(ctx context.Context) error {
 		return err
 	}
 
-	dnatRules := make([]dnat.InfoDNAT, 0, len(s.Spec.DNAT))
-	for _, rule := range s.Spec.DNAT {
-		dnatRules = append(dnatRules, dnat.InfoDNAT(rule))
+	// Only validate the targets of the mode that will be applied: in FIP mode
+	// SNAT and DNAT are ignored. The check stays before the EIP is created so
+	// that a refusal never leaves a half-created EIP behind.
+	var targetsErr error
+	if s.Spec.InternalIP != "" {
+		targetsErr = validateInternalTargets(subnet.Spec.CIDRBlock, s.Spec.InternalIP, nil, nil)
+	} else {
+		dnatRules := make([]dnat.InfoDNAT, 0, len(s.Spec.DNAT))
+		for _, rule := range s.Spec.DNAT {
+			dnatRules = append(dnatRules, dnat.InfoDNAT(rule))
+		}
+		targetsErr = validateInternalTargets(subnet.Spec.CIDRBlock, "", s.Spec.SNAT, dnatRules)
 	}
-	if err := validateInternalTargets(subnet.Spec.CIDRBlock, s.Spec.InternalIP, s.Spec.SNAT, dnatRules); err != nil {
+	if err := targetsErr; err != nil {
 		log.Warn().Err(err).Str("subnet", s.General.SubnetEId).Msg("EIP creation refused: internal target outside subnet")
 		return err
 	}

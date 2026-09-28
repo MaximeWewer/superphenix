@@ -58,7 +58,15 @@ func (s *UpdateEIPInfo) UpdateEip(ctx context.Context, namespace, name string) e
 		log.Warn().Err(err).Str("subnet", eip.Spec.NatGwDp).Str("namespace", namespace).Msg("EIP update refused: subnet not accessible")
 		return err
 	}
-	if err := validateInternalTargets(subnet.Spec.CIDRBlock, s.Spec.InternalIP, s.Spec.SNAT, s.Spec.DNAT); err != nil {
+	// Only validate the targets of the mode that will be applied (FIP mode
+	// ignores SNAT and DNAT), before any rule is deleted or recreated.
+	var targetsErr error
+	if s.Spec.InternalIP != "" {
+		targetsErr = validateInternalTargets(subnet.Spec.CIDRBlock, s.Spec.InternalIP, nil, nil)
+	} else {
+		targetsErr = validateInternalTargets(subnet.Spec.CIDRBlock, "", s.Spec.SNAT, s.Spec.DNAT)
+	}
+	if err := targetsErr; err != nil {
 		log.Warn().Err(err).Str("subnet", eip.Spec.NatGwDp).Msg("EIP update refused: internal target outside subnet")
 		return err
 	}

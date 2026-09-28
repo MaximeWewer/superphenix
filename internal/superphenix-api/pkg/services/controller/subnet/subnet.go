@@ -242,6 +242,18 @@ func (h *Service) CreateSubnet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The VPC comes from the request body: reject a VPC of another project
+	// before anything is created. The controller enforces the same rule.
+	if code, err := checkVpcReference(body.General.VpcEId, projectEntity.ID, product.FindByEId); err != nil {
+		log.Warn().Err(err).Str("vpcEId", body.General.VpcEId).Str("projectId", projectEntity.ID.String()).Msg("Subnet creation refused")
+		msg := err.Error()
+		if code == http.StatusInternalServerError {
+			msg = consts.SpxResourceCreationFailure
+		}
+		httpError.Http(w, r, code).Str("vpcEId", body.General.VpcEId).Msg(msg)
+		return
+	}
+
 	subnet, m, err := controller.CreateIntoDb(r.Context(), body.General.ProductName, model.ProductTypeSubnet.Name, azDb.Code, org.ID, projectEntity.ID)
 	if err != nil {
 		log.Err(err).Msg("Failed to save product into database")
@@ -502,6 +514,37 @@ func combineListResult(concatResults map[string][]interface{}, resources []model
 	})
 
 	return combineResults
+}
+
+var (
+	errVpcRequired = errors.New("vpcEId is required")
+	errVpcNotFound = errors.New("VPC not found")
+)
+
+// checkVpcReference validates the VPC referenced when creating a subnet. It
+// returns the HTTP status to answer with when the reference is refused.
+//
+// A VPC tracked in the database must belong to the project and be a VPC. A
+// VPC unknown to the database (e.g. managed outside the API) is left to the
+// controller, which checks the project label on the Kubernetes object.
+func checkVpcReference(vpcEId string, projectId uuid.UUID, findByEId func(string) (model.Product, error)) (int, error) {
+	if vpcEId == "" {
+		return http.StatusBadRequest, errVpcRequired
+	}
+
+	vpc, err := findByEId(vpcEId)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, nil
+	}
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+
+	if vpc.ProjectId != projectId || vpc.ProductTypeId != model.ProductTypeVPC.Name {
+		return http.StatusNotFound, errVpcNotFound
+	}
+
+	return 0, nil
 }
 
 // ProductResponse is the shared response base defined by the controller kit.

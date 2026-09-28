@@ -197,6 +197,16 @@ func createEIP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = body.CreateEip(r.Context())
+	if errors.IsNotFound(err) {
+		log.Warn().Err(err).Msg("Subnet not found in project")
+		httpError.Http(w, r, http.StatusNotFound).Msg("Subnet not found")
+		return
+	}
+	if errors.IsBadRequest(err) {
+		log.Warn().Err(err).Msg("Invalid EIP internal target")
+		httpError.Http(w, r, http.StatusBadRequest).Msg(err.Error())
+		return
+	}
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create EIP")
 		httpError.Http(w, r, http.StatusInternalServerError).Msg("Failed to create EIP")
@@ -241,6 +251,11 @@ func updateEIP(w http.ResponseWriter, r *http.Request) {
 		if errors.IsNotFound(err) {
 			log.Err(err).Msg("Resource not found")
 			httpError.Http(w, r, http.StatusNotFound).Msg("Resource not found")
+			return
+		}
+		if errors.IsBadRequest(err) {
+			log.Warn().Err(err).Msg("Invalid EIP internal target")
+			httpError.Http(w, r, http.StatusBadRequest).Msg(err.Error())
 			return
 		}
 		log.Error().Err(err).Msg("Failed to update EIP")

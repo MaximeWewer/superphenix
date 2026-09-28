@@ -7,8 +7,6 @@ import (
 
 	"github.com/super-phenix/superphenix/internal/superphenix-controller/internal/utils"
 
-	spxId "github.com/super-phenix/superphenix/pkg/superphenix-id"
-
 	"github.com/rs/zerolog/log"
 )
 
@@ -191,16 +189,7 @@ func isCIDRAllowed(network *net.IPNet) bool {
 	return false
 }
 func isAllowedSharedSubnet(annotations map[string]string, projectID string) bool {
-	allowedProjects, exists := annotations[spxId.SpxAnnotationAllowedProjects]
-	if !exists {
-		return false
-	}
-	for _, id := range strings.Split(allowedProjects, ",") {
-		if strings.TrimSpace(id) == projectID {
-			return true
-		}
-	}
-	return false
+	return utils.IsSharedWithProject(annotations, projectID)
 }
 
 func checkDnsIP(dnsV4, dnsV6 string) error {

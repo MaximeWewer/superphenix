@@ -38,15 +38,17 @@ data:
     done
 
     echo "[+] Running helm upgrade."
-    helm upgrade --install {{ $cluster.postInstallChart.chartName }} \
-      {{- if regexMatch "^oci" $cluster.postInstallChart.repoUrl }}
-      {{ $cluster.postInstallChart.repoUrl }}/{{ $cluster.postInstallChart.chartName }} \
-      {{- else }}
-      {{ $cluster.postInstallChart.chartName }} \
-      --repo {{ $cluster.postInstallChart.repoUrl }} \
-      {{- end }}
-      --version {{ $cluster.postInstallChart.chartVersion }} \
-      --namespace {{ $cluster.postInstallChart.namespace | default "default" }} \
+    # User-provided values are passed through environment variables and always
+    # quoted: they are never interpolated into the script itself.
+    case "$PIC_REPO_URL" in
+      oci://*) set -- "$PIC_REPO_URL/$PIC_CHART_NAME" ;;
+      *)       set -- "$PIC_CHART_NAME" --repo "$PIC_REPO_URL" ;;
+    esac
+    if [ -n "$PIC_CHART_VERSION" ]; then
+      set -- "$@" --version "$PIC_CHART_VERSION"
+    fi
+    helm upgrade --install "$PIC_CHART_NAME" "$@" \
+      --namespace "${PIC_NAMESPACE:-default}" \
       --create-namespace \
       --kubeconfig /var/run/kubeconfig \
       -f /job/values/values.yaml
@@ -98,6 +100,15 @@ spec:
         - name: post-install-job
           image: "alpine/helm:3.19"
           command: ["/job/script/script.sh"]
+          env:
+            - name: PIC_CHART_NAME
+              value: {{ $cluster.postInstallChart.chartName | toString | quote }}
+            - name: PIC_CHART_VERSION
+              value: {{ $cluster.postInstallChart.chartVersion | default "" | toString | quote }}
+            - name: PIC_REPO_URL
+              value: {{ $cluster.postInstallChart.repoUrl | toString | quote }}
+            - name: PIC_NAMESPACE
+              value: {{ $cluster.postInstallChart.namespace | default "" | toString | quote }}
           volumeMounts:
             - name: script
               mountPath: /job/script

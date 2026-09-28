@@ -24,6 +24,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type CreateOrUpdateProjectBody struct {
@@ -172,8 +173,12 @@ func RemoveProject(ctx context.Context, orgaId, projectId string) error {
 	// authorized on their own organization could delete any project by id
 	// (cross-organization IDOR).
 	if _, err := project.FindByIdAndOrgaId(projectUuid, orgaUuid); err != nil {
-		log.Error().Err(err).Str("orgaId", orgaId).Str("projectId", projectId).Msg("Project not found in organization")
-		return ErrProjectNotInOrga
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Warn().Str("orgaId", orgaId).Str("projectId", projectId).Msg("Project not found in organization")
+			return ErrProjectNotInOrga
+		}
+		log.Error().Err(err).Str("orgaId", orgaId).Str("projectId", projectId).Msg("Failed to look up project")
+		return err
 	}
 
 	// Mark all Resources for deletion
@@ -183,13 +188,13 @@ func RemoveProject(ctx context.Context, orgaId, projectId string) error {
 	}
 
 	// Delete resources in database
-	if err := product.DeleteByProject(projectId); err != nil {
+	if err := product.DeleteByProject(projectUuid, orgaUuid); err != nil {
 		log.Error().Err(err).Msg("Failed to delete products in project")
 		return err
 	}
 
 	// Delete project in database
-	if err := project.DeleteById(projectUuid); err != nil {
+	if err := project.DeleteById(projectUuid, orgaUuid); err != nil {
 		log.Error().Err(err).Msg("Failed to delete project")
 		return err
 	}

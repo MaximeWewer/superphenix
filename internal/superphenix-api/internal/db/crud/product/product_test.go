@@ -2,6 +2,7 @@ package product
 
 import (
 	"errors"
+	"regexp"
 	"testing"
 
 	"github.com/super-phenix/superphenix/internal/superphenix-api/internal/db"
@@ -301,4 +302,25 @@ func TestCountForProject(t *testing.T) {
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
+}
+
+// TestDeleteByProject checks that products are only deleted through a
+// subquery scoped to the project AND its organization.
+func TestDeleteByProject(t *testing.T) {
+	const query = `UPDATE "products" SET "deleted_at"=$1 WHERE project_id IN (SELECT "id" FROM "projects" WHERE (id = $2 AND orga_id = $3) AND "projects"."deleted_at" IS NULL) AND "products"."deleted_at" IS NULL`
+
+	mock, cleanup := setupMockDB(t)
+	defer cleanup()
+
+	projectId := uuid.New()
+	orgaId := uuid.New()
+
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(query)).
+		WithArgs(sqlmock.AnyArg(), projectId, orgaId).
+		WillReturnResult(sqlmock.NewResult(0, 3))
+	mock.ExpectCommit()
+
+	assert.NoError(t, DeleteByProject(projectId, orgaId))
+	assert.NoError(t, mock.ExpectationsWereMet())
 }

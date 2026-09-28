@@ -14,7 +14,7 @@ import (
 )
 
 // setupMockDB creates a sqlmock-backed gorm.DB and swaps it into db.Client.
-func setupMockDB(t *testing.T) (sqlmock.Sqlmock, func()) {
+func setupMockDB(t *testing.T) sqlmock.Sqlmock {
 	t.Helper()
 	sqlDB, mock, err := sqlmock.New()
 	if err != nil {
@@ -28,46 +28,103 @@ func setupMockDB(t *testing.T) (sqlmock.Sqlmock, func()) {
 
 	oldClient := db.Client
 	db.Client = gormDB
-	return mock, func() {
+	t.Cleanup(func() {
 		db.Client = oldClient
-		sqlDB.Close()
-	}
+		_ = sqlDB.Close()
+	})
+	return mock
 }
 
-// TestFindByIdAndOrgaId verifies the authorization guard used before project
-// deletion: the query must be scoped by BOTH the project id and the
-// organization id, and a project that does not belong to the organization must
-// yield an error (so RemoveProject aborts before any destructive action).
 func TestFindByIdAndOrgaId(t *testing.T) {
+	const query = `SELECT * FROM "projects" WHERE (id = $1 AND orga_id = $2) AND "projects"."deleted_at" IS NULL ORDER BY "projects"."id" LIMIT $3`
+
 	projectID := uuid.New()
 	orgaID := uuid.New()
 
-	t.Run("returns the project when it belongs to the organization", func(t *testing.T) {
-		mock, cleanup := setupMockDB(t)
-		defer cleanup()
+	tests := []struct {
+		name      string
+		projectID uuid.UUID
+		orgaID    uuid.UUID
+		found     bool
+		wantErr   error
+	}{
+		{
+			name:      "project in organization",
+			projectID: projectID,
+			orgaID:    orgaID,
+			found:     true,
+		},
+		{
+			name:      "project in another organization",
+			projectID: projectID,
+			orgaID:    uuid.New(),
+			wantErr:   gorm.ErrRecordNotFound,
+		},
+		{
+			name:      "nil project id keeps the id condition",
+			projectID: uuid.Nil,
+			orgaID:    orgaID,
+			wantErr:   gorm.ErrRecordNotFound,
+		},
+	}
 
-		rows := sqlmock.NewRows([]string{"id", "orga_id", "name"}).
-			AddRow(projectID, orgaID, "my-project")
-		// The WHERE clause must carry the orga_id filter, not just the id.
-		mock.ExpectQuery(regexp.QuoteMeta(`"orga_id"`)).WillReturnRows(rows)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := setupMockDB(t)
 
-		p, err := FindByIdAndOrgaId(projectID, orgaID)
-		assert.NoError(t, err)
-		assert.Equal(t, projectID, p.ID)
-		assert.Equal(t, orgaID, p.OrgaId)
-		assert.NoError(t, mock.ExpectationsWereMet())
-	})
+			rows := sqlmock.NewRows([]string{"id", "orga_id", "name"})
+			if tt.found {
+				rows.AddRow(tt.projectID, tt.orgaID, "my-project")
+			}
+			mock.ExpectQuery(regexp.QuoteMeta(query)).
+				WithArgs(tt.projectID, tt.orgaID, 1).
+				WillReturnRows(rows)
 
-	t.Run("returns error for a project of another organization", func(t *testing.T) {
-		mock, cleanup := setupMockDB(t)
-		defer cleanup()
+			p, err := FindByIdAndOrgaId(tt.projectID, tt.orgaID)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.projectID, p.ID)
+				assert.Equal(t, tt.orgaID, p.OrgaId)
+			}
+			assert.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
 
-		// Row set is empty: the project id exists but not under this orga_id.
-		rows := sqlmock.NewRows([]string{"id", "orga_id", "name"})
-		mock.ExpectQuery(`SELECT`).WillReturnRows(rows)
+func TestDeleteById(t *testing.T) {
+	const query = `UPDATE "projects" SET "deleted_at"=$1 WHERE (id = $2 AND orga_id = $3) AND "projects"."deleted_at" IS NULL`
 
-		_, err := FindByIdAndOrgaId(projectID, uuid.New())
-		assert.Error(t, err)
-		assert.NoError(t, mock.ExpectationsWereMet())
-	})
+	projectID := uuid.New()
+	orgaID := uuid.New()
+
+	tests := []struct {
+		name         string
+		rowsAffected int64
+		wantErr      error
+	}{
+		{name: "project of the organization is deleted", rowsAffected: 1},
+		{name: "project of another organization is not deleted", rowsAffected: 0, wantErr: gorm.ErrRecordNotFound},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := setupMockDB(t)
+
+			mock.ExpectBegin()
+			mock.ExpectExec(regexp.QuoteMeta(query)).
+				WithArgs(sqlmock.AnyArg(), projectID, orgaID).
+				WillReturnResult(sqlmock.NewResult(0, tt.rowsAffected))
+			mock.ExpectCommit()
+
+			err := DeleteById(projectID, orgaID)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
 }

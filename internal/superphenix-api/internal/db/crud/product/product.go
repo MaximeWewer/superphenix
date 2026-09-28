@@ -40,9 +40,15 @@ func DeleteByEIdAndAZCodeAndProject(productEId, azCode string, projectId uuid.UU
 	return result.RowsAffected, result.Error
 }
 
-func DeleteByProject(projectId string) error {
-	result := db.Client.Where("project_id = ?", projectId).Delete(&model.Product{})
-	return result.Error
+// DeleteByProject deletes the products of a project, only when the project
+// belongs to the given organization.
+func DeleteByProject(projectId, orgaId uuid.UUID) error {
+	ownedProject := db.Client.Model(&model.Project{}).
+		Select("id").
+		Where("id = ? AND orga_id = ?", projectId, orgaId)
+	return db.Client.
+		Where("project_id IN (?)", ownedProject).
+		Delete(&model.Product{}).Error
 }
 
 func FindByEId(productEId string) (model.Product, error) {

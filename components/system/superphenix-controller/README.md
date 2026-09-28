@@ -9,6 +9,11 @@ Helm chart to deploy the Superphenix AZ controller
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | affinity | object | `{}` |  |
+| authSecret.generate | bool | `true` | Generate a random shared secret (used by the API to call this controller) in a Kubernetes Secret with a Job, if the Secret does not exist yet. |
+| authSecret.image.repository | string | `"alpine/kubectl"` | The image repository to use for the secret generation job. |
+| authSecret.image.tag | string | `"1.35.0"` | The image tag to use for the secret generation job. |
+| authSecret.key | string | `"auth-secret"` | Key of the shared secret in the Secret. |
+| authSecret.secretName | string | `""` | Name of the Secret holding the shared secret. Defaults to `<fullname>-auth`. Set it with `generate: false` to use a Secret you manage yourself. |
 | fullnameOverride | string | `""` |  |
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.repository | string | `"ghcr.io/super-phenix/superphenix-controller"` |  |
@@ -20,6 +25,9 @@ Helm chart to deploy the Superphenix AZ controller
 | livenessProbe.httpGet.path | string | `"/health"` |  |
 | livenessProbe.httpGet.port | string | `"http"` |  |
 | nameOverride | string | `""` |  |
+| networkPolicy.allowedFrom | list | `[{"podSelector":{"matchLabels":{"app.kubernetes.io/name":"superphenix-api"}}}]` | Peers allowed to call the controller API port. Add the ingress controller namespace when remote AZs use `ingress`. |
+| networkPolicy.enabled | bool | `false` | Restrict ingress to the controller. Disabled by default: validate it on your CNI first (kubelet probes, remote AZs reaching the controller through the Ingress). |
+| networkPolicy.metricsFrom | list | `[]` | Peers allowed to scrape metrics. Empty means any source. |
 | nodeSelector | object | `{}` |  |
 | podAnnotations | object | `{}` |  |
 | podLabels | object | `{}` |  |

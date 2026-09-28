@@ -153,7 +153,7 @@ logging:
   pretty: true
 http:
   address: ":8080"
-  authSecret: "secret"
+  authSecret: "" # must be set to a random value, see SUPERPHENIX-CONTROLLER_HTTP_AUTHSECRET
 webhook:
   enabled: false
   address: ":8443"

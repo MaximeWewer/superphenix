@@ -35,13 +35,26 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default (printf "v%s" .Chart.AppVersion) }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if or .Values.jwtSecret.generate .Values.jwtSecret.secretName }}
+          {{- if or .Values.jwtSecret.generate .Values.jwtSecret.secretName .Values.azAuthSecrets }}
           env:
+            {{- if or .Values.jwtSecret.generate .Values.jwtSecret.secretName }}
             - name: SUPERPHENIX-API_AUTHENTICATION_JWTSECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.jwtSecret.secretName | default (printf "%s-jwt" (include "superphenix-api.fullname" .)) }}
                   key: jwt-secret
+            {{- end }}
+            {{- range .Values.azAuthSecrets }}
+            # Overrides `azs.<az>.authSecret`, which must still be declared in the config.
+            - name: {{ printf "SUPERPHENIX-API_AZS_%s_AUTHSECRET" (upper .az) }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "azAuthSecrets[].secretName is required" .secretName }}
+                  key: {{ .key | default "auth-secret" }}
+                  # A missing Secret leaves the config value in place, and the API
+                  # refuses to start if that value is empty or weak.
+                  optional: true
+            {{- end }}
           {{- end }}
           ports:
             - name: http

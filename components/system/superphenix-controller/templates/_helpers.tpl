@@ -60,3 +60,10 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Name of the Secret holding the shared secret used by the API to call the controller
+*/}}
+{{- define "superphenix-controller.authSecretName" -}}
+{{- .Values.authSecret.secretName | default (printf "%s-auth" (include "superphenix-controller.fullname" .)) }}
+{{- end }}

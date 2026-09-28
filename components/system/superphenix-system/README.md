@@ -1817,7 +1817,7 @@ Applications that omit `targetRevision` (or set it to `""`) inherit `Chart.AppVe
         },
         "azs": {
           "local": {
-            "authSecret": "secret!",
+            "authSecret": "",
             "controllerUrl": "http://superphenix-controller.{{ (index $.Values.apps \"superphenix-controller\").namespace }}.svc.cluster.local:8080",
             "destination": "in-cluster",
             "name": "Local AZ"
@@ -1969,9 +1969,6 @@ Applications that omit `targetRevision` (or set it to `""`) inherit `Chart.AppVe
               "windows"
             ]
           }
-        },
-        "http": {
-          "authSecret": "secret!"
         },
         "productsConfig": {
           "blockStorage": {
@@ -4669,7 +4666,7 @@ Applications that omit `targetRevision` (or set it to `""`) inherit `Chart.AppVe
       },
       "azs": {
         "local": {
-          "authSecret": "secret!",
+          "authSecret": "",
           "controllerUrl": "http://superphenix-controller.{{ (index $.Values.apps \"superphenix-controller\").namespace }}.svc.cluster.local:8080",
           "destination": "in-cluster",
           "name": "Local AZ"
@@ -4904,9 +4901,6 @@ Applications that omit `targetRevision` (or set it to `""`) inherit `Chart.AppVe
             "windows"
           ]
         }
-      },
-      "http": {
-        "authSecret": "secret!"
       },
       "productsConfig": {
         "blockStorage": {

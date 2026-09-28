@@ -14,6 +14,7 @@ Helm chart to deploy the Superphenix API
 | autoscaling.minReplicas | int | `1` |  |
 | autoscaling.targetCPUUtilizationPercentage | int | `80` |  |
 | autoscaling.targetMemoryUtilizationPercentage | int | `80` |  |
+| azAuthSecrets | list | `[]` | Controller shared secrets read from Kubernetes Secrets, one entry per AZ. Each entry overrides `config.azs.<az>.authSecret`, which must still be declared (an empty string is fine). |
 | config | object | `{}` |  |
 | containerPorts.adminHttp | int | `7000` |  |
 | containerPorts.http | int | `8080` |  |

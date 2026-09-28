@@ -1,0 +1,35 @@
+{{- if .Values.networkPolicy.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "superphenix-controller.fullname" . }}
+  labels:
+    {{- include "superphenix-controller.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "superphenix-controller.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    # Controller API: only the allowed callers (the superphenix-api by default).
+    - ports:
+        - port: {{ .Values.service.port }}
+          protocol: TCP
+      from:
+        {{- toYaml .Values.networkPolicy.allowedFrom | nindent 8 }}
+    # Prometheus metrics.
+    - ports:
+        - port: 9090
+          protocol: TCP
+      {{- with .Values.networkPolicy.metricsFrom }}
+      from:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- if .Values.webhook.enabled }}
+    # Admission webhook, called by the kube-apiserver (source cannot be selected).
+    - ports:
+        - port: 8443
+          protocol: TCP
+    {{- end }}
+{{- end }}

@@ -36,6 +36,16 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default (printf "v%s" .Chart.AppVersion) }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if or .Values.authSecret.generate .Values.authSecret.secretName }}
+          env:
+            # Overrides `http.authSecret`: the shared secret lives in a Secret,
+            # not in the ConfigMap.
+            - name: SUPERPHENIX-CONTROLLER_HTTP_AUTHSECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "superphenix-controller.authSecretName" . }}
+                  key: {{ .Values.authSecret.key }}
+          {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}

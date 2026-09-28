@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/super-phenix/superphenix/internal/superphenix-controller/internal/kubeovn/eip/dnat"
 	"github.com/super-phenix/superphenix/internal/superphenix-controller/internal/kubeovn/eip/fip"
 	k8s "github.com/super-phenix/superphenix/internal/superphenix-controller/pkg/config"
 	logger "github.com/super-phenix/superphenix/pkg/utils/log"
@@ -44,6 +45,24 @@ func (s *CreateEIPInfo) CreateEip(ctx context.Context) error {
 	if s.Spec.InternalIP == "" && len(s.Spec.SNAT) == 0 {
 		err := fmt.Errorf("no internalIP or SNAT specified")
 		log.Err(err).Msg("Failed to create eip")
+		return err
+	}
+
+	// The subnet (and thus the NAT gateway) comes from the request body: it
+	// must be usable by the caller's project, and every internal target must
+	// lie within it.
+	subnet, err := getAccessibleSubnet(ctx, s.General.SubnetEId, s.GetProjectID())
+	if err != nil {
+		log.Warn().Err(err).Str("subnet", s.General.SubnetEId).Str("projectID", s.GetProjectID()).Msg("EIP creation refused: subnet not accessible")
+		return err
+	}
+
+	dnatRules := make([]dnat.InfoDNAT, 0, len(s.Spec.DNAT))
+	for _, rule := range s.Spec.DNAT {
+		dnatRules = append(dnatRules, dnat.InfoDNAT(rule))
+	}
+	if err := validateInternalTargets(subnet.Spec.CIDRBlock, s.Spec.InternalIP, s.Spec.SNAT, dnatRules); err != nil {
+		log.Warn().Err(err).Str("subnet", s.General.SubnetEId).Msg("EIP creation refused: internal target outside subnet")
 		return err
 	}
 

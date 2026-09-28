@@ -3,6 +3,7 @@ package project
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/super-phenix/superphenix/internal/superphenix-api/internal/db/crud/group"
@@ -29,6 +30,11 @@ type CreateOrUpdateProjectBody struct {
 	Id   string `json:"id"`
 	Name string `json:"name" validate:"max=63"`
 }
+
+// ErrProjectNotInOrga is returned when a project does not belong to the
+// organization it is being addressed under. Callers map it to a 404 so that a
+// cross-organization reference is indistinguishable from a missing project.
+var ErrProjectNotInOrga = errors.New("project not found in organization")
 
 // CreateOrUpdateProject
 //
@@ -133,6 +139,10 @@ func (h *Service) DeleteProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := RemoveProject(r.Context(), orgaId, projectId); err != nil {
+		if errors.Is(err, ErrProjectNotInOrga) {
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			return
+		}
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	} else {
 		w.WriteHeader(http.StatusOK)
@@ -144,7 +154,27 @@ func (h *Service) DeleteProject(w http.ResponseWriter, r *http.Request) {
 // RemoveProject delete the project and all associated resources
 func RemoveProject(ctx context.Context, orgaId, projectId string) error {
 	log := logger.GetLogger(ctx)
-	projectUuid, _ := uuid.Parse(projectId)
+
+	orgaUuid, err := uuid.Parse(orgaId)
+	if err != nil {
+		log.Error().Err(err).Str("orgaId", orgaId).Msg("Invalid organization id")
+		return err
+	}
+
+	projectUuid, err := uuid.Parse(projectId)
+	if err != nil {
+		log.Error().Err(err).Str("projectId", projectId).Msg("Invalid project id")
+		return err
+	}
+
+	// Authorization guard: ensure the project belongs to this organization
+	// before performing any destructive action. Without this check, a caller
+	// authorized on their own organization could delete any project by id
+	// (cross-organization IDOR).
+	if _, err := project.FindByIdAndOrgaId(projectUuid, orgaUuid); err != nil {
+		log.Error().Err(err).Str("orgaId", orgaId).Str("projectId", projectId).Msg("Project not found in organization")
+		return ErrProjectNotInOrga
+	}
 
 	// Mark all Resources for deletion
 	if err := gc.MarkResources(ctx, orgaId, projectId); err != nil {

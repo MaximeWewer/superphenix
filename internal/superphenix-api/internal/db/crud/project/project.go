@@ -36,6 +36,19 @@ func DeleteById(projectId uuid.UUID) error {
 	return result.Error
 }
 
+// FindByIdAndOrgaId returns the project only when it belongs to the given
+// organization. It is the authorization guard used before any destructive
+// operation on a project, so that a project of another organization cannot be
+// addressed by id alone.
+func FindByIdAndOrgaId(projectId, orgaId uuid.UUID) (model.Project, error) {
+	return crud.Find[model.Project, model.Project](model.Project{
+		Model: model.Model{
+			ID: projectId,
+		},
+		OrgaId: orgaId,
+	})
+}
+
 // CreateProject create a new project into the database
 //
 // DO NOT USE OUTSIDE OF PROJECT INITIALIZATION - data.InitializeProject

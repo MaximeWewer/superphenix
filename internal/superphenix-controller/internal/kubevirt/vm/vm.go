@@ -42,6 +42,16 @@ func IsVMInSubnet(ctx context.Context, namespace, subnetName string) (bool, erro
 	return false, nil
 }
 
+// checkOwnedVM verifies that the VM exists in the namespace and belongs to its
+// project, before an action is run on it.
+func checkOwnedVM(ctx context.Context, namespace, name string) error {
+	vm, err := config.VirtClient.VirtualMachine(namespace).Get(ctx, name, k8smetav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	return utils.CheckProjectLabel(vm, namespace)
+}
+
 // IsVMMountDisk return if a Disk is mounted in a VM
 // If not return false
 // If it's mounted return true and the EID of the VM where the disk is mounted
@@ -88,6 +98,10 @@ func IsVMListMountDisk(vms []view.VirtualMachineView, diskName string) (bool, st
 
 func StartVM(ctx context.Context, namespace, name string) error {
 	log := logger.GetLogger(ctx)
+	if err := checkOwnedVM(ctx, namespace, name); err != nil {
+		log.Warn().Err(err).Str("namespace", namespace).Str("name", name).Msg("VM access denied")
+		return err
+	}
 	err := config.VirtClient.VirtualMachine(namespace).Start(ctx, name, &v1.StartOptions{})
 	if err != nil {
 		log.Err(err).Str("namespace", namespace).Str("name", name).Msg("Error starting vm")
@@ -98,6 +112,10 @@ func StartVM(ctx context.Context, namespace, name string) error {
 
 func StopVM(ctx context.Context, namespace, name string, force bool) error {
 	log := logger.GetLogger(ctx)
+	if err := checkOwnedVM(ctx, namespace, name); err != nil {
+		log.Warn().Err(err).Str("namespace", namespace).Str("name", name).Msg("VM access denied")
+		return err
+	}
 	gracePeriod := int64(180)
 
 	if force {
@@ -116,6 +134,10 @@ func StopVM(ctx context.Context, namespace, name string, force bool) error {
 
 func RestartVM(ctx context.Context, namespace, name string) error {
 	log := logger.GetLogger(ctx)
+	if err := checkOwnedVM(ctx, namespace, name); err != nil {
+		log.Warn().Err(err).Str("namespace", namespace).Str("name", name).Msg("VM access denied")
+		return err
+	}
 	err := config.VirtClient.VirtualMachine(namespace).Restart(ctx, name, &v1.RestartOptions{})
 	if err != nil {
 		log.Err(err).Str("namespace", namespace).Str("name", name).Msg("Error restarting vm")

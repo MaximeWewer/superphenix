@@ -6,7 +6,10 @@ import (
 
 	"github.com/super-phenix/superphenix/internal/superphenix-controller/pkg/config"
 
+	spxId "github.com/super-phenix/superphenix/pkg/superphenix-id"
+
 	"go.uber.org/mock/gomock"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "kubevirt.io/api/core/v1"
 	"kubevirt.io/client-go/kubecli"
@@ -58,6 +61,49 @@ func TestIsVMInSubnet(t *testing.T) {
 			got, err := IsVMInSubnet(context.Background(), hardeningNamespace, subnet)
 			if err != nil || got != tt.want {
 				t.Errorf("IsVMInSubnet() = %v, %v, want %v", got, err, tt.want)
+			}
+		})
+	}
+}
+
+func TestPowerActionsRefuseAVMOfAnotherProject(t *testing.T) {
+	foreign := vmWithNetwork("vm", hardeningNamespace, "", map[string]string{spxId.SpxLabelProjectID: otherNamespace})
+	actions := map[string]func() error{
+		"start":   func() error { return StartVM(context.Background(), hardeningNamespace, "vm") },
+		"stop":    func() error { return StopVM(context.Background(), hardeningNamespace, "vm", false) },
+		"restart": func() error { return RestartVM(context.Background(), hardeningNamespace, "vm") },
+	}
+	for name, action := range actions {
+		t.Run(name, func(t *testing.T) {
+			client, vmIface := mockVirtClientVM(t)
+			client.EXPECT().VirtualMachine(hardeningNamespace).Return(vmIface).AnyTimes()
+			vmIface.EXPECT().Get(gomock.Any(), "vm", gomock.Any()).Return(&foreign, nil)
+			// No Start/Stop/Restart call is expected: gomock fails the test otherwise.
+			if err := action(); !apierrors.IsNotFound(err) {
+				t.Errorf("error = %v, want NotFound", err)
+			}
+		})
+	}
+}
+
+func TestContainerDiskMountRefusesManagedVMs(t *testing.T) {
+	tests := []struct {
+		name   string
+		labels map[string]string
+	}{
+		{name: "VM of another project", labels: map[string]string{spxId.SpxLabelProjectID: otherNamespace}},
+		{name: "gitops-managed VM", labels: map[string]string{spxId.SpxLabelProjectID: hardeningNamespace, spxId.SpxLabelGitops: "true"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, vmIface := mockVirtClientVM(t)
+			vm := vmWithNetwork("vm", hardeningNamespace, "", tt.labels)
+			client.EXPECT().VirtualMachine(hardeningNamespace).Return(vmIface).AnyTimes()
+			vmIface.EXPECT().Get(gomock.Any(), "vm", gomock.Any()).Return(&vm, nil)
+			// No Update call is expected.
+			err := MountContainerDisks(context.Background(), hardeningNamespace, "vm", []ContainerDiskSpec{{}})
+			if err == nil {
+				t.Error("MountContainerDisks() modified a VM it must not modify")
 			}
 		})
 	}

@@ -10,6 +10,7 @@ import (
 	httpError "github.com/super-phenix/superphenix/pkg/utils/error"
 	logger "github.com/super-phenix/superphenix/pkg/utils/log"
 
+	kovmutils "github.com/super-phenix/superphenix/internal/superphenix-controller/internal/utils"
 	"github.com/super-phenix/superphenix/internal/superphenix-controller/pkg/api/utils"
 	"github.com/super-phenix/superphenix/internal/superphenix-controller/pkg/config"
 
@@ -214,9 +215,14 @@ func SerialEndpoint(router chi.Router) {
 			return
 		}
 
-		_, err := config.VirtClient.VirtualMachineInstance(namespace).Get(r.Context(), effectiveId, k8smetav1.GetOptions{})
+		vmi, err := config.VirtClient.VirtualMachineInstance(namespace).Get(r.Context(), effectiveId, k8smetav1.GetOptions{})
 		if err != nil {
 			l.Err(err).Msg("Failed to find the vmi")
+			httpError.Http(w, r, http.StatusNotFound).Msg(http.StatusText(http.StatusNotFound))
+			return
+		}
+		if err := kovmutils.CheckProjectLabel(vmi, namespace); err != nil {
+			l.Warn().Str("namespace", namespace).Str("name", effectiveId).Msg("VMI access denied")
 			httpError.Http(w, r, http.StatusNotFound).Msg(http.StatusText(http.StatusNotFound))
 			return
 		}

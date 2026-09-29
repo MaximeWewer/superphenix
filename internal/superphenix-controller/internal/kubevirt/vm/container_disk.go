@@ -9,6 +9,7 @@ import (
 	k8smetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "kubevirt.io/api/core/v1"
 
+	"github.com/super-phenix/superphenix/internal/superphenix-controller/internal/utils"
 	"github.com/super-phenix/superphenix/internal/superphenix-controller/pkg/config"
 )
 
@@ -180,6 +181,14 @@ func MountContainerDisks(ctx context.Context, namespace, vmName string, specs []
 		log.Err(err).Str("namespace", namespace).Str("name", vmName).Msg("Failed to find the VM")
 		return err
 	}
+	if err := utils.CheckProjectLabel(vm, namespace); err != nil {
+		log.Warn().Str("namespace", namespace).Str("name", vmName).Msg("VM access denied")
+		return err
+	}
+	if err := utils.IsEditAllowed(vm.GetLabels()); err != nil {
+		log.Warn().Err(err).Str("namespace", namespace).Str("name", vmName).Msg("Edit not allowed on this VM")
+		return err
+	}
 
 	changed, err := applyMounts(vm, specs)
 	if err != nil {
@@ -207,6 +216,14 @@ func UnmountContainerDisks(ctx context.Context, namespace, vmName string, specs 
 	vm, err := config.VirtClient.VirtualMachine(namespace).Get(ctx, vmName, k8smetav1.GetOptions{})
 	if err != nil {
 		log.Err(err).Str("namespace", namespace).Str("name", vmName).Msg("Failed to find the VM")
+		return err
+	}
+	if err := utils.CheckProjectLabel(vm, namespace); err != nil {
+		log.Warn().Str("namespace", namespace).Str("name", vmName).Msg("VM access denied")
+		return err
+	}
+	if err := utils.IsEditAllowed(vm.GetLabels()); err != nil {
+		log.Warn().Err(err).Str("namespace", namespace).Str("name", vmName).Msg("Edit not allowed on this VM")
 		return err
 	}
 

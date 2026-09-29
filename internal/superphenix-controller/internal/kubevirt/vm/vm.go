@@ -15,18 +15,27 @@ import (
 	v1 "kubevirt.io/api/core/v1"
 )
 
+// IsVMInSubnet reports whether a VM is attached to the subnet. VMs reference
+// the subnet through a multus network named "<subnet namespace>/<subnet>",
+// possibly from another namespace when the subnet is shared, so every
+// namespace is checked.
 func IsVMInSubnet(ctx context.Context, namespace, subnetName string) (bool, error) {
 	log := logger.GetLogger(ctx)
-	vms, err := config.VirtClient.VirtualMachine(namespace).List(ctx, k8smetav1.ListOptions{})
+	vms, err := config.VirtClient.VirtualMachine(k8smetav1.NamespaceAll).List(ctx, k8smetav1.ListOptions{})
 	if err != nil {
 		log.Err(err).Str("namespace", namespace).Msg("error listing vms")
 		return false, err
 	}
 
+	networkName := fmt.Sprintf("%s/%s", namespace, subnetName)
 	for _, vm := range vms.Items {
-		annotation := fmt.Sprintf("%s.%s.ovn.kubernetes.io/port_security", subnetName, namespace)
-		if vm.Spec.Template.ObjectMeta.Annotations[annotation] == "true" {
-			return true, nil
+		if vm.Spec.Template == nil {
+			continue
+		}
+		for _, network := range vm.Spec.Template.Spec.Networks {
+			if network.Multus != nil && network.Multus.NetworkName == networkName {
+				return true, nil
+			}
 		}
 	}
 

@@ -23,8 +23,6 @@ spec:
       expression: object.metadata.labels[{{ include "policies.resEffectiveIDLabel" "" }}]
     - name: spxidRegex
       expression: r{{ include "policies.regex" "spxid" | replace "^" "" | replace  "$" "" }}
-    - name: testMissingLabel
-      expression: r{{ include "policies.testMissingLabel" "" }}
   failurePolicy: Fail
   {{- include "policies.matchConditions" $val | nindent 2 }}
   matchConstraints:
@@ -40,8 +38,7 @@ spec:
   validations:
     # Check that the namespace is the ProjectID
     - expression: |
-        variables.testMissingLabel in object.metadata.labels ||
-        variables.namespaces[0].matches(variables.projectID)
+        variables.namespaces == [variables.projectID]
       messageExpression: |
         "##### " + object.kind + " has an incorrect namespace (" +
         variables.namespaces.map(k,k).join(", ") + "), must be the ProjectID. #####"
@@ -53,7 +50,6 @@ spec:
       message: "##### Subnet cannot have ACLs #####"
     # Check Provider value regex ("SPXID.projectID.ovn", for "subnetID.namespace.ovn")
     - expression: |
-        variables.testMissingLabel in object.metadata.labels ||
         object.spec.provider.matches(string(
           variables.spxidRegex + "." + variables.projectID + "." + "ovn")
         )
@@ -63,7 +59,6 @@ spec:
       message: "##### Incorrect Subnet provider, should be \"subnetID.namespace.ovn\" #####"
     # Check that "routeTable" is the same as "name" and "effectiveID"
     - expression: |
-        variables.testMissingLabel in object.metadata.labels ||
         object.spec.routeTable.matches(variables.name) &&
         variables.name.matches(variables.effectiveID)
       messageExpression: |

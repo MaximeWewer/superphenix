@@ -6,6 +6,53 @@ A Helm chart for templating Validating Admission Policies
 
 ## Values
 
+<h3>Argo CD tenant ownership</h3>
+<table>
+	<thead>
+		<th>Key</th>
+		<th>Type</th>
+		<th>Default</th>
+		<th>Description</th>
+	</thead>
+	<tbody>
+		<tr>
+			<td>policies.argo-tenant-ownership</td>
+			<td>object</td>
+			<td><pre lang="">
+"{}"
+</pre>
+</td>
+			<td>Bind the cluster-scoped objects (namespaces, Kube-OVN network objects, Kamaji datastores) applied by a project's Argo CD Applications to that project, and prevent taking over objects of another project</td>
+		</tr>
+		<tr>
+			<td>policies.argo-tenant-ownership.debug</td>
+			<td>bool</td>
+			<td><pre lang="json">
+false
+</pre>
+</td>
+			<td>If debug is True, the VAP only matches resources having the "test-janna" label.</td>
+		</tr>
+		<tr>
+			<td>policies.argo-tenant-ownership.trackingAnnotation</td>
+			<td>string</td>
+			<td><pre lang="json">
+"argocd.argoproj.io/tracking-id"
+</pre>
+</td>
+			<td>Annotation Argo CD sets on the objects it applies (resourceTrackingMethod: annotation).</td>
+		</tr>
+		<tr>
+			<td>policies.argo-tenant-ownership.validationActions</td>
+			<td>string</td>
+			<td><pre lang="json">
+"[Deny, Audit]"
+</pre>
+</td>
+			<td>Actions to take if the validation fails. Possible values are: Deny, Warn, Audit.</td>
+		</tr>
+	</tbody>
+</table>
 <h3>DataVolume Labels and Annotations</h3>
 <table>
 	<thead>

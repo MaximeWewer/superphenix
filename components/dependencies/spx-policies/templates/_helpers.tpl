@@ -139,13 +139,6 @@ Nabok label
 {{- end }}
 
 {{/*
-Label for test resources missing a required label on purpose
-*/}}
-{{- define "policies.testMissingLabel" -}}
-"testMissingLabel"
-{{- end }}
-
-{{/*
 Regex for label values and other fields
 */}}
 {{- define "policies.regex" -}}

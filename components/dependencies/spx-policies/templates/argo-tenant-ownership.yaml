@@ -1,0 +1,91 @@
+{{- range $name, $val := .Values.policies }}
+{{- if eq $name "argo-tenant-ownership" }}
+
+---
+# ------------------------------------------------------------------------------------
+# Bind the cluster-scoped objects applied by a project's Argo CD Applications to that
+# project. Argo CD sets its tracking annotation on every object it applies; for the
+# Applications of a project it starts with "<project namespace>_". The object must
+# belong to that project, and must not take over an object of another project.
+# ------------------------------------------------------------------------------------
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: vap-{{ $name }}
+  labels:
+    {{- include "policies.labels" $ | nindent 4 }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    matchPolicy: Equivalent
+    namespaceSelector: {}
+    objectSelector: {}
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["namespaces"]
+        scope: '*'
+      - apiGroups: ["kubeovn.io"]
+        apiVersions: ["*"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["vpcs", "subnets", "vpc-nat-gateways", "iptables-eips", "iptables-fip-rules", "iptables-snat-rules", "iptables-dnat-rules", "switch-lb-rules"]
+        scope: '*'
+      - apiGroups: ["kamaji.clastix.io"]
+        apiVersions: ["*"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["datastores"]
+        scope: '*'
+  matchConditions:
+    # Only objects applied by an Application living in a project namespace
+    - name: matchProjectApplication
+      expression: |
+        has(object.metadata.annotations) &&
+        {{ $val.trackingAnnotation | quote }} in object.metadata.annotations &&
+        object.metadata.annotations[{{ $val.trackingAnnotation | quote }}].startsWith("spx-") &&
+        object.metadata.annotations[{{ $val.trackingAnnotation | quote }}].contains("_")
+  variables:
+    - name: appNamespace
+      expression: object.metadata.annotations[{{ $val.trackingAnnotation | quote }}].split("_")[0]
+    - name: projectIDLabel
+      expression: r{{ include "policies.projectIDLabel" "" }}
+    - name: projectID
+      expression: |
+        has(object.metadata.labels) && variables.projectIDLabel in object.metadata.labels ?
+        object.metadata.labels[variables.projectIDLabel] : ""
+    - name: isNamespace
+      expression: request.resource.group == "" && request.resource.resource == "namespaces"
+  validations:
+    # A project Application may only manage its own namespace
+    - expression: "!variables.isNamespace || object.metadata.name == variables.appNamespace"
+      messageExpression: |
+        "##### Namespace " + object.metadata.name + " cannot be managed by an Application of " + variables.appNamespace + ". #####"
+      message: "##### A project Application may only manage its own namespace #####"
+    # Other objects must carry the projectID of the Application's project
+    - expression: "variables.isNamespace || variables.projectID == variables.appNamespace"
+      messageExpression: |
+        "##### " + object.kind + " " + object.metadata.name + " must have the " + variables.projectIDLabel +
+        " label set to " + variables.appNamespace + ". #####"
+      message: "##### Object must belong to the project of its Application #####"
+    # No takeover: the projectID of an existing object cannot change
+    - expression: |
+        request.operation != "UPDATE" ||
+        !has(oldObject.metadata.labels) ||
+        !(variables.projectIDLabel in oldObject.metadata.labels) ||
+        oldObject.metadata.labels[variables.projectIDLabel] == variables.projectID
+      messageExpression: |
+        "##### " + object.kind + " " + object.metadata.name + " belongs to " +
+        oldObject.metadata.labels[variables.projectIDLabel] + " and cannot be taken over. #####"
+      message: "##### Object belongs to another project #####"
+
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: vap-{{ $name }}-binding
+spec:
+  policyName: vap-{{ $name }}
+  validationActions: {{ $val.validationActions }}
+  {{- include "policies.debug" $val | indent 2 }}
+{{- end }}
+{{- end }}

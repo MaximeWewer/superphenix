@@ -22,12 +22,10 @@ spec:
     - name: configRegex
       expression: |
         string(
-          r'{\s*"*cniVersion"*:\s*"*0\.3\.1"*,\s*"*name"*:\s*"*generic-veth"*,\s*"*plugins"*:\s*\[\s*{\s*"*type"*:\s*"*kube-ovn"*,\s*"*server_socket"*:\s*"*/run/openvswitch/kube-ovn-daemon\.sock"*,\s*"*provider"*:\s*"*' +
+          r'^\s*{\s*"*cniVersion"*:\s*"*0\.3\.1"*,\s*"*name"*:\s*"*generic-veth"*,\s*"*plugins"*:\s*\[\s*{\s*"*type"*:\s*"*kube-ovn"*,\s*"*server_socket"*:\s*"*/run/openvswitch/kube-ovn-daemon\.sock"*,\s*"*provider"*:\s*"*' +
           variables.spxidRegex + '.' +
-          variables.spxidRegex + r'.ovn"*\s*}\s*]\s*}'
+          variables.spxidRegex + r'.ovn"*\s*}\s*]\s*}\s*$'
         )
-    - name: testMissingLabel
-      expression: r{{ include "policies.testMissingLabel" "" }}
   failurePolicy: Fail
   {{- include "policies.matchConditions" $val | nindent 2 }}
   matchConstraints:
@@ -54,9 +52,8 @@ spec:
       message: "##### Invalid Network-Attachment-Definition config #####"
     # Check that the config contains the correct provider ("SPXID.projectID.ovn", for "subnetID.namespace.ovn")
     - expression: |
-        variables.testMissingLabel in object.metadata.labels ||
         variables.config.matches(string(
-          r'.*provider"*:\s*"*' + variables.spxidRegex + "." + variables.projectID + r'.ovn.*'
+          r'.*provider"*:\s*"*' + variables.spxidRegex + r'\.' + object.metadata.namespace + r'\.ovn"*\s*}.*'
         ))
       messageExpression: |
         "##### " + object.kind + " has an invalid Provider in config (" +

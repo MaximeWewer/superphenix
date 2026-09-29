@@ -1,4 +1,18 @@
 policies:
+  # -- Bind the cluster-scoped objects (namespaces, Kube-OVN network objects, Kamaji datastores) applied by a project's Argo CD Applications to that project, and prevent taking over objects of another project
+  # @section -- Argo CD tenant ownership
+  # @default -- "{}"
+  argo-tenant-ownership:
+    # -- Annotation Argo CD sets on the objects it applies (resourceTrackingMethod: annotation).
+    # @section -- Argo CD tenant ownership
+    trackingAnnotation: "argocd.argoproj.io/tracking-id"
+    # -- Actions to take if the validation fails. Possible values are: Deny, Warn, Audit.
+    # @section -- Argo CD tenant ownership
+    validationActions: "[Deny, Audit]"
+    # -- If debug is True, the VAP only matches resources having the "test-janna" label.
+    # @section -- Argo CD tenant ownership
+    debug: false
+
   # -- Check that all IaaS resources have the necessary labels with correct naming
   # @section -- Labels (IaaS)
   # @default -- "{}"

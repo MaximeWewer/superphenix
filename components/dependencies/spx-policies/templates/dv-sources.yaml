@@ -25,8 +25,6 @@ spec:
       expression: r{{ include "policies.regex" "vmsnapshotVolume" }}
     - name: projectID
       expression: object.metadata.labels[{{ include "policies.projectIDLabel" "" }}]
-    - name: testMissingLabel
-      expression: r{{ include "policies.testMissingLabel" "" }}
   failurePolicy: Fail
   {{- include "policies.matchConditions" $val | nindent 2 }}
   matchConstraints:
@@ -72,21 +70,20 @@ spec:
       message: "##### Incorrect Datavolume source name regex, must be an SPXID, snapshot, or VM snapshot volume name #####"
     # If PVC or Snapshot, check that the namespace is the ProjectID
     - expression: |
-        variables.testMissingLabel in object.metadata.labels ||
         variables.source.all(s,
           !(s in ["pvc", "snapshot"]) ||
-          variables.source[s].namespace.matches(variables.projectID)
+          variables.source[s].namespace == object.metadata.namespace
         )
       messageExpression: |
         "##### " + object.kind +
         " source has an incorrect namespace (" +
         variables.source.filter(s,
           s in ["pvc", "snapshot"] &&
-          !variables.source[s].namespace.matches(variables.projectID)
+          variables.source[s].namespace != object.metadata.namespace
         ).map(k, variables.source[k].namespace)
         .join(", ") +
-        "), must be the ProjectID. #####"
-      message: "##### Incorrect Datavolume source namespace, must be the ProjectID #####"
+        "), must be the namespace of the DataVolume. #####"
+      message: "##### Incorrect Datavolume source namespace, must be the namespace of the DataVolume #####"
 
 ---
 apiVersion: admissionregistration.k8s.io/v1

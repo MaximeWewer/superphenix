@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"crypto/tls"
 	"flag"
@@ -16,9 +17,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,8 +33,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	operatorv1alpha1 "github.com/super-phenix/superphenix/api/operator/v1alpha1"
+	argov1alpha1 "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
+	"github.com/super-phenix/superphenix/internal/superphenix-operator/db"
 	"github.com/super-phenix/superphenix/internal/superphenix-operator/cluster"
 	"github.com/super-phenix/superphenix/internal/superphenix-operator/management"
+	"github.com/super-phenix/superphenix/internal/superphenix-operator/organization"
+	"github.com/super-phenix/superphenix/internal/superphenix-operator/project"
 	"github.com/super-phenix/superphenix/internal/superphenix-operator/telemetry"
 	"github.com/super-phenix/superphenix/internal/superphenix-operator/version"
 	"github.com/super-phenix/superphenix/pkg/argocd"
@@ -47,6 +54,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(argov1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -79,6 +87,15 @@ func main() {
 	var telemetryEndpoint string
 	var disableVersionValidation bool
 	var installWithoutCNI bool
+	var databaseHost string
+	var databasePort string
+	var databaseUser string
+	var databasePassword string
+	var databaseName string
+	var autoDatabaseConnect bool
+	var gitopsRepoURL string
+	var gitopsPath string
+	var gitopsTargetRevision string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -115,6 +132,15 @@ func main() {
 	flag.StringVar(&telemetryEndpoint, "telemetry-endpoint", telemetry.DefaultEndpoint, "URL of the telemetry ingest endpoint")
 	flag.BoolVar(&disableVersionValidation, "disable-version-validation", false, "Disable validation of versions entirely")
 	flag.BoolVar(&installWithoutCNI, "install-without-cni", false, "Whether to install components without a CNI. Necessary when deploying the operator on a cluster without a CNI.")
+	flag.StringVar(&databaseHost, "database-host", os.Getenv("DATABASE_HOST"), "The host of the Superphenix Database")
+	flag.StringVar(&databasePort, "database-port", os.Getenv("DATABASE_PORT"), "The port of the Superphenix Database")
+	flag.StringVar(&databaseUser, "database-user", os.Getenv("DATABASE_USER"), "The user of the Superphenix Database")
+	flag.StringVar(&databasePassword, "database-password", os.Getenv("DATABASE_PASSWORD"), "The password of the Superphenix Database")
+	flag.StringVar(&databaseName, "database-name", os.Getenv("DATABASE_NAME"), "The name of the Superphenix Database")
+	flag.BoolVar(&autoDatabaseConnect, "auto-database-connect", false, "Whether to automatically connect to the default deployed PostgreSQL by probing the 'postgres' secret")
+	flag.StringVar(&gitopsRepoURL, "gitops-repo-url", os.Getenv("GITOPS_REPO_URL"), "Default repository URL for project GitOps applications")
+	flag.StringVar(&gitopsPath, "gitops-path", cmp.Or(os.Getenv("GITOPS_PATH"), "."), "Default path for project GitOps applications")
+	flag.StringVar(&gitopsTargetRevision, "gitops-target-revision", cmp.Or(os.Getenv("GITOPS_TARGET_REVISION"), "HEAD"), "Default target revision for project GitOps applications")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -122,6 +148,9 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	// Initialize Database connection
+	initDatabase(autoDatabaseConnect, operatorNamespace, databaseHost, databasePort, databaseUser, databasePassword, databaseName)
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -207,9 +236,6 @@ func main() {
 		os.Exit(1)
 	}
 	argoAppByObject := cache.ByObject{Label: managedSel}
-	if operatorNamespace != "" {
-		argoAppByObject.Namespaces = map[string]cache.Config{operatorNamespace: {}}
-	}
 
 	// On a brand new cluster the ArgoCD CRDs are not yet installed, so we cannot
 	// register a ByObject filter for Applications (controller-runtime would fail
@@ -257,6 +283,29 @@ func main() {
 		DisableVersionValidation: disableVersionValidation,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "Cluster")
+		os.Exit(1)
+	}
+
+	if err := (&organization.Reconciler{
+		Client:            mgr.GetClient(),
+		Scheme:            mgr.GetScheme(),
+		OperatorNamespace: operatorNamespace,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "Organization")
+		os.Exit(1)
+	}
+
+	if err := (&project.Reconciler{
+		Client:            mgr.GetClient(),
+		Scheme:            mgr.GetScheme(),
+		OperatorNamespace: operatorNamespace,
+		GitOpsConfig: project.GitOpsConfig{
+			RepoURL:        gitopsRepoURL,
+			Path:           gitopsPath,
+			TargetRevision: gitopsTargetRevision,
+		},
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "Project")
 		os.Exit(1)
 	}
 
@@ -323,6 +372,51 @@ func argoCDCRDsPresent(cfg *rest.Config) bool {
 		return false
 	}
 	return argocd.CheckCRDs(context.Background(), mapper) == nil
+}
+
+// initDatabase initializes the connection to the Superphenix Database.
+func initDatabase(autoDatabaseConnect bool, operatorNamespace, databaseHost, databasePort, databaseUser, databasePassword, databaseName string) {
+	if databaseHost == "" && !autoDatabaseConnect {
+		setupLog.Info("Superphenix Database connection parameters not provided; database-related features will be disabled")
+		return
+	}
+
+	setupLog.Info("Initializing Superphenix Database connection", "host", databaseHost, "port", databasePort, "database", databaseName, "autoConnect", autoDatabaseConnect)
+	go func() {
+		for {
+			host, user, password, name, port := databaseHost, databaseUser, databasePassword, databaseName, databasePort
+			if autoDatabaseConnect {
+				config := ctrl.GetConfigOrDie()
+				k8sClient, err := client.New(config, client.Options{Scheme: scheme})
+				if err != nil {
+					setupLog.Error(err, "Failed to create Kubernetes client for Database auto-connect, retrying in 30s")
+					time.Sleep(30 * time.Second)
+					continue
+				}
+				var secret corev1.Secret
+				err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "postgres", Namespace: operatorNamespace}, &secret)
+				if err != nil {
+					setupLog.Error(err, "Failed to fetch 'postgres' secret, retrying in 30s", "namespace", operatorNamespace)
+					time.Sleep(30 * time.Second)
+					continue
+				}
+
+				name = string(secret.Data["database"])
+				host = string(secret.Data["host"])
+				port = string(secret.Data["port"])
+				password = string(secret.Data["postgres-password"])
+				user = string(secret.Data["username"])
+			}
+
+			if err := db.InitDatabase(host, user, password, name, port); err != nil {
+				setupLog.Error(err, "Failed to initialize database connection, retrying in 30s")
+				time.Sleep(30 * time.Second)
+				continue
+			}
+			setupLog.Info("Successfully connected to Superphenix Database")
+			break
+		}
+	}()
 }
 
 // waitForArgoCDCRDsThenExit polls until the ArgoCD CRDs become available,

@@ -20,6 +20,9 @@ Helm chart to deploy the Superphenix AZ controller
 | livenessProbe.httpGet.path | string | `"/health"` |  |
 | livenessProbe.httpGet.port | string | `"http"` |  |
 | nameOverride | string | `""` |  |
+| networkPolicy.allowedFrom | list | `[{"podSelector":{"matchLabels":{"app.kubernetes.io/name":"superphenix-api"}}}]` | Peers allowed to call the controller API port. Add the ingress controller namespace when remote AZs use `ingress`. |
+| networkPolicy.enabled | bool | `false` | Restrict ingress to the controller. Disabled by default: validate it on your CNI first (kubelet probes, remote AZs reaching the controller through the Ingress). |
+| networkPolicy.metricsFrom | list | `[]` | Peers allowed to scrape metrics. Empty means any source. |
 | nodeSelector | object | `{}` |  |
 | podAnnotations | object | `{}` |  |
 | podLabels | object | `{}` |  |

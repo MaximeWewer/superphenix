@@ -1,6 +1,7 @@
 package authentication
 
 import (
+	"crypto/subtle"
 	"net/http"
 	"strings"
 
@@ -12,9 +13,10 @@ import (
 func BearerAuth() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if bearer, ok := bearerAuth(r); !ok || bearer != config.Global.Http.AuthSecret {
+			if bearer, ok := bearerAuth(r); !ok || !secretMatches(bearer, config.Global.Http.AuthSecret) {
+				// Never log the presented bearer: it may be a real or near-miss secret.
 				log := logger.GetLogger(r.Context())
-				log.Error().Str("bearer", bearer).Msg("Bearer auth failed")
+				log.Error().Bool("bearerPresent", ok).Msg("Bearer auth failed")
 				bearerAuthFailed(w)
 				return
 			}
@@ -22,6 +24,15 @@ func BearerAuth() func(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// secretMatches compares the presented bearer with the configured secret in
+// constant time. An empty configured secret never matches.
+func secretMatches(bearer, expected string) bool {
+	if expected == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(bearer), []byte(expected)) == 1
 }
 
 func bearerAuthFailed(w http.ResponseWriter) {

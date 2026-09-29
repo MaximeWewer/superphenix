@@ -36,6 +36,22 @@ func CheckProjectLabel(obj metav1.Object, namespace string) error {
 	return nil
 }
 
+// IsSharedWithProject reports whether the object's allowed-projects annotation
+// lists the given project. It is how a subnet is explicitly shared with other
+// projects.
+func IsSharedWithProject(annotations map[string]string, projectID string) bool {
+	allowedProjects, exists := annotations[spxId.SpxAnnotationAllowedProjects]
+	if !exists {
+		return false
+	}
+	for _, id := range strings.Split(allowedProjects, ",") {
+		if strings.TrimSpace(id) == projectID {
+			return true
+		}
+	}
+	return false
+}
+
 func IsEditAllowed(labels map[string]string) error {
 	return isEditAllowed(labels, false)
 }

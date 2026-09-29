@@ -66,6 +66,19 @@ webhook:
 
 config: {}
 
+networkPolicy:
+  # -- Restrict ingress to the controller. Disabled by default: validate it on your
+  # CNI first (kubelet probes, remote AZs reaching the controller through the Ingress).
+  enabled: false
+  # -- Peers allowed to call the controller API port.
+  # Add the ingress controller namespace when remote AZs use `ingress`.
+  allowedFrom:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: superphenix-api
+  # -- Peers allowed to scrape metrics. Empty means any source.
+  metricsFrom: []
+
 ingress:
   enabled: false
   annotations:

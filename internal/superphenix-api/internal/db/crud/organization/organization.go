@@ -238,12 +238,13 @@ func convertUserAndRoleToUserRole(users []*model.User, roles []*model.UserOrgani
 			}
 
 			result = append(result, &httpModel.APIUserGroup{
+				// The invite code is not listed: it lets anyone who knows it
+				// add the user to an organization or transfer one to them.
 				User: &httpModel.APIUserReduce{
-					APIModel:   httpModel.APIModel{ID: user.ID},
-					Firstname:  user.Firstname,
-					Lastname:   user.Lastname,
-					Email:      user.Email,
-					InviteCode: user.InviteCode,
+					APIModel:  httpModel.APIModel{ID: user.ID},
+					Firstname: user.Firstname,
+					Lastname:  user.Lastname,
+					Email:     user.Email,
 				},
 				Groups: groups,
 			})

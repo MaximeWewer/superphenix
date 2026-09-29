@@ -3,6 +3,7 @@ package kaas
 import (
 	"context"
 	"fmt"
+	"regexp"
 
 	"github.com/super-phenix/superphenix/internal/superphenix-controller/internal/utils"
 	k8s "github.com/super-phenix/superphenix/internal/superphenix-controller/pkg/config"
@@ -10,8 +11,12 @@ import (
 
 	spxId "github.com/super-phenix/superphenix/pkg/superphenix-id"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// groupNameRegex matches node group names as the API accepts them.
+var groupNameRegex = regexp.MustCompile(`^[a-zA-Z0-9-]{1,63}$`)
 
 func DeleteGroup(ctx context.Context, namespace, effectiveId string, groupList []string) error {
 	log := logger.GetLogger(ctx)
@@ -39,10 +44,18 @@ func DeleteGroup(ctx context.Context, namespace, effectiveId string, groupList [
 		return fmt.Errorf("cluster localId not found")
 	}
 
+	for _, group := range groupList {
+		if !groupNameRegex.MatchString(group) {
+			return apierrors.NewBadRequest(fmt.Sprintf("invalid node group name %q", group))
+		}
+	}
+
 	mdResources := k8s.DynamicClientSet.Resource(machineDeploymentsGVR).Namespace(namespace)
 	for _, group := range groupList {
 		resourceName := fmt.Sprintf("%s-%s", localId, group)
-		labelSelector := fmt.Sprintf("%s=%s", spxId.SpxLabelResourceName, resourceName)
+		// Scope the selector to this cluster: another cluster of the project
+		// could have a resource with the same name.
+		labelSelector := fmt.Sprintf("%s=%s,%s=%s", spxId.SpxLabelResourceName, resourceName, ClusterLabelKey, effectiveId)
 
 		err := mdResources.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{
 			LabelSelector: labelSelector,

@@ -13,6 +13,11 @@ import (
 func GetKubeConfig(ctx context.Context, namespace, effectiveId string) ([]byte, error) {
 	log := logger.GetLogger(ctx)
 
+	// The kubeconfig is only returned for a cluster of the project.
+	if _, err := GetCluster(ctx, namespace, effectiveId); err != nil {
+		return make([]byte, 0), err
+	}
+
 	secretName := fmt.Sprintf("%s-kubeconfig", effectiveId)
 	kubeconfig, err := k8s.K8sClient.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
 	if err != nil {

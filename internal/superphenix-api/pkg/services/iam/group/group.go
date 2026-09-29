@@ -3,6 +3,7 @@ package group
 import (
 	"encoding/json"
 	"net/http"
+	"slices"
 
 	groupDb "github.com/super-phenix/superphenix/internal/superphenix-api/internal/db/crud/group"
 	orgaDb "github.com/super-phenix/superphenix/internal/superphenix-api/internal/db/crud/organization"
@@ -159,7 +160,19 @@ func (h *Service) CreateOrUpdateOrganizationGroup(w http.ResponseWriter, r *http
 			http.Error(w, reason, http.StatusForbidden)
 			return
 		}
+
+		if err := checkRequestedPermissionSets(body.PermissionSets, group.PermissionSets); err != nil {
+			log.Warn().Err(err).Str("groupId", body.ID.String()).Msg("Group update refused")
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 	} else {
+		if err := checkRequestedPermissionSets(body.PermissionSets, nil); err != nil {
+			log.Warn().Err(err).Msg("Group creation refused")
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
 		// Existing duplicates left by the backfill keep working, but no new ones appear.
 		if v1.IsPredefinedGroupName(body.Name) {
 			const reason = "Cannot create a group named after a predefined group"
@@ -191,7 +204,9 @@ func (h *Service) CreateOrUpdateOrganizationGroup(w http.ResponseWriter, r *http
 	// Set orgaId matching with the url called
 	cast.OrgaId = orgaUuid
 	// As this is a hidden relationship, we have to re-add it manually each time.
-	cast.PermissionSets = append(cast.PermissionSets, v1PSet.SpxMember)
+	cast.PermissionSets = append(slices.DeleteFunc(cast.PermissionSets, func(ps string) bool {
+		return ps == v1PSet.SpxMember
+	}), v1PSet.SpxMember)
 	group, err := SaveGroup(r.Context(), cast)
 	if err != nil {
 		log.Error().Err(err).Any("group", body).Msg("Failed to save group")
@@ -341,13 +356,15 @@ func (h *Service) DuplicateOrganizationGroup(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// PredefinedKey left nil: the copy is custom.
+	// PredefinedKey left nil: the copy is custom, so it must not inherit
+	// internal sets such as spx_owner (duplicating the Owner group would
+	// otherwise produce an invitable owner group).
 	group, err := SaveGroup(r.Context(), model.Group{
 		Name:           body.Name,
 		OrgaId:         orgaUuid,
 		AllProjects:    source.AllProjects,
 		ProjectIds:     source.ProjectIds,
-		PermissionSets: source.PermissionSets,
+		PermissionSets: append(assignablePermissionSets(source.PermissionSets), v1PSet.SpxMember),
 	})
 	if err != nil {
 		log.Error().Err(err).Str("groupId", groupId).Msg("Failed to duplicate group")

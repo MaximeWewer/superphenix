@@ -293,11 +293,20 @@ func parseReturnUrl(ctx context.Context, returnTo string) string {
 
 	// Create callback url from returnTo origin, and add the redirect Path
 	// This will be used by Angular for automatic navigation
-	returnPath := urlParse.Path
-	if returnPath == "" {
-		returnPath = "/"
+	return fmt.Sprintf("%s://%s/callback?return_to=%s&", urlParse.Scheme, urlParse.Host, encodeReturnPath(urlParse.Path))
+}
+
+// encodeReturnPath makes the return path safe to embed as the return_to query
+// value of the callback URL. The path comes decoded from url.Parse, so it may
+// contain "&", "=" or "#" that would add parameters (e.g. a second session=)
+// to the callback URL: they are percent-encoded. "/" is kept readable, as it
+// is valid in a query value. A path starting with "//" or "/\" would be read
+// as another host by the frontend and is replaced by "/".
+func encodeReturnPath(path string) string {
+	if path == "" || !strings.HasPrefix(path, "/") || strings.HasPrefix(path, "//") || strings.HasPrefix(path, "/\\") {
+		return "/"
 	}
-	return fmt.Sprintf("%s://%s/callback?return_to=%s&", urlParse.Scheme, urlParse.Host, returnPath)
+	return strings.ReplaceAll(url.QueryEscape(path), "%2F", "/")
 }
 
 func contactAdminResponse(w http.ResponseWriter, r *http.Request) {

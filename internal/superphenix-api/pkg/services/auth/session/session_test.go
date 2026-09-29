@@ -685,6 +685,26 @@ func Test_parseReturnUrl(t *testing.T) {
 			args: args{returnTo: "http://localhost:4200", allowedOrigins: []string{"http://localhost:4200"}},
 			want: "http://localhost:4200/callback?return_to=/&",
 		},
+		{
+			name: "Encoded query separators in the path cannot add parameters",
+			args: args{returnTo: "http://localhost:4201/a%26session%3Dforged", allowedOrigins: []string{"http://localhost:4201"}},
+			want: "http://localhost:4201/callback?return_to=/a%26session%3Dforged&",
+		},
+		{
+			name: "Encoded fragment and question mark are kept encoded",
+			args: args{returnTo: "http://localhost:4201/a%23b%3Fc", allowedOrigins: []string{"http://localhost:4201"}},
+			want: "http://localhost:4201/callback?return_to=/a%23b%3Fc&",
+		},
+		{
+			name: "Protocol-relative path is replaced by the root",
+			args: args{returnTo: "http://localhost:4201//attacker.example/x", allowedOrigins: []string{"http://localhost:4201"}},
+			want: "http://localhost:4201/callback?return_to=/&",
+		},
+		{
+			name: "Backslash path is replaced by the root",
+			args: args{returnTo: "http://localhost:4201/%5Cattacker.example", allowedOrigins: []string{"http://localhost:4201"}},
+			want: "http://localhost:4201/callback?return_to=/&",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

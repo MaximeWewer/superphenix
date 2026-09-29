@@ -8,10 +8,12 @@ import (
 	k8s "github.com/super-phenix/superphenix/internal/superphenix-controller/pkg/config"
 
 	spxId "github.com/super-phenix/superphenix/pkg/superphenix-id"
+	"github.com/super-phenix/superphenix/pkg/utils/nat"
 
 	"github.com/google/uuid"
 	v1 "github.com/kubeovn/kube-ovn/pkg/apis/kubeovn/v1"
 	"github.com/rs/zerolog/log"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -28,6 +30,11 @@ func CreateDNAT(ctx context.Context, item InfoDNAT, eipMetadata spxId.Metadata) 
 	if err != nil {
 		log.Err(err).Msg("Failed to parse eip uuid")
 		return err
+	}
+
+	if err := nat.ValidateDNAT(item.ExternalPort, item.InternalPort, item.Protocol); err != nil {
+		log.Warn().Err(err).Msg("DNAT rule refused")
+		return apierrors.NewBadRequest(err.Error())
 	}
 
 	externalPort := strings.TrimSpace(item.ExternalPort)

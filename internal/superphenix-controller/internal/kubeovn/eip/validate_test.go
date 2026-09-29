@@ -94,7 +94,9 @@ func TestValidateInternalTargets(t *testing.T) {
 		{name: "SNAT on the whole subnet", snat: []string{"10.10.0.0/24"}},
 		{name: "SNAT on a smaller range", snat: []string{"10.10.0.128/25"}},
 		{name: "SNAT on a single IP", snat: []string{"10.10.0.7"}},
-		{name: "DNAT inside subnet", snat: []string{"10.10.0.0/24"}, dnat: []dnat.InfoDNAT{{InternalIP: "10.10.0.9"}}},
+		{name: "DNAT inside subnet", snat: []string{"10.10.0.0/24"}, dnat: []dnat.InfoDNAT{{InternalIP: "10.10.0.9", ExternalPort: "80", InternalPort: "8080", Protocol: "tcp"}}},
+		{name: "DNAT with an invalid port", snat: []string{"10.10.0.0/24"}, dnat: []dnat.InfoDNAT{{InternalIP: "10.10.0.9", ExternalPort: "80 81", InternalPort: "8080", Protocol: "tcp"}}, wantErr: true},
+		{name: "DNAT with an invalid protocol", snat: []string{"10.10.0.0/24"}, dnat: []dnat.InfoDNAT{{InternalIP: "10.10.0.9", ExternalPort: "80", InternalPort: "8080", Protocol: "sctp"}}, wantErr: true},
 
 		{name: "FIP to another tenant IP", internalIP: "10.20.0.5", wantErr: true},
 		{name: "FIP to a node or service IP", internalIP: "192.168.1.10", wantErr: true},
@@ -104,7 +106,7 @@ func TestValidateInternalTargets(t *testing.T) {
 		{name: "SNAT on another range", snat: []string{"10.20.0.0/24"}, wantErr: true},
 		{name: "SNAT invalid CIDR", snat: []string{"10.10.0.0/99"}, wantErr: true},
 		{name: "DNAT to another tenant IP", snat: []string{"10.10.0.0/24"}, dnat: []dnat.InfoDNAT{{InternalIP: "10.20.0.9"}}, wantErr: true},
-		{name: "one bad DNAT among good ones", snat: []string{"10.10.0.0/24"}, dnat: []dnat.InfoDNAT{{InternalIP: "10.10.0.9"}, {InternalIP: "8.8.8.8"}}, wantErr: true},
+		{name: "one bad DNAT among good ones", snat: []string{"10.10.0.0/24"}, dnat: []dnat.InfoDNAT{{InternalIP: "10.10.0.9", ExternalPort: "80", InternalPort: "80"}, {InternalIP: "8.8.8.8", ExternalPort: "81", InternalPort: "81"}}, wantErr: true},
 	}
 
 	for _, tt := range tests {

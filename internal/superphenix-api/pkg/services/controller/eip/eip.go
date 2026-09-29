@@ -18,6 +18,7 @@ import (
 	"github.com/super-phenix/superphenix/pkg/utils/decoder"
 	httpError "github.com/super-phenix/superphenix/pkg/utils/error"
 	logger "github.com/super-phenix/superphenix/pkg/utils/log"
+	"github.com/super-phenix/superphenix/pkg/utils/nat"
 
 	spxId "github.com/super-phenix/superphenix/pkg/superphenix-id"
 
@@ -242,6 +243,11 @@ func (h *Service) CreateEip(w http.ResponseWriter, r *http.Request) {
 	if err := decoder.HandleHTTPJSON(w, r, &body, h.cfg.PublicHTTP.MaxBodySize); err != nil {
 		return
 	}
+	if err := validateDNATRules(body.Spec.DNAT); err != nil {
+		log.Warn().Err(err).Msg("Invalid DNAT rule")
+		httpError.Http(w, r, http.StatusBadRequest).Msg(err.Error())
+		return
+	}
 
 	eip, m, err := controller.CreateIntoDb(r.Context(), body.General.ProductName, model.ProductTypeEIP.Name, azDb.Code, org.ID, projectEntity.ID)
 	if err != nil {
@@ -311,6 +317,11 @@ func (h *Service) UpdateEip(w http.ResponseWriter, r *http.Request) {
 
 	var body UpdateEipBody
 	if err := decoder.HandleHTTPJSON(w, r, &body, h.cfg.PublicHTTP.MaxBodySize); err != nil {
+		return
+	}
+	if err := validateDNATRules(body.Spec.DNAT); err != nil {
+		log.Warn().Err(err).Msg("Invalid DNAT rule")
+		httpError.Http(w, r, http.StatusBadRequest).Msg(err.Error())
 		return
 	}
 	productEid := chi.URLParam(r, "effectiveId")
@@ -546,4 +557,15 @@ type EipFullResponse struct {
 	Fip             interface{} `json:"fip,omitempty"`
 	SNat            interface{} `json:"snat,omitempty"`
 	DNat            interface{} `json:"dnat,omitempty"`
+}
+
+// validateDNATRules checks the ports and protocol of every DNAT rule before the
+// product is saved: they end up in the NAT gateway's iptables rules.
+func validateDNATRules(rules []EipDNATBody) error {
+	for _, rule := range rules {
+		if err := nat.ValidateDNAT(rule.ExternalPort, rule.InternalPort, rule.Protocol); err != nil {
+			return err
+		}
+	}
+	return nil
 }

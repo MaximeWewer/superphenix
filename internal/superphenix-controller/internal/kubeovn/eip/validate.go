@@ -11,6 +11,7 @@ import (
 	k8s "github.com/super-phenix/superphenix/internal/superphenix-controller/pkg/config"
 
 	spxId "github.com/super-phenix/superphenix/pkg/superphenix-id"
+	"github.com/super-phenix/superphenix/pkg/utils/nat"
 
 	v1 "github.com/kubeovn/kube-ovn/pkg/apis/kubeovn/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -61,6 +62,10 @@ func validateInternalTargets(subnetCIDR, internalIP string, snatCIDRs []string, 
 	for _, rule := range dnatRules {
 		if err := checkIPInSubnet(subnetCIDR, rule.InternalIP); err != nil {
 			return err
+		}
+		// Ports and protocol end up in the NAT gateway's iptables rules.
+		if err := nat.ValidateDNAT(rule.ExternalPort, rule.InternalPort, rule.Protocol); err != nil {
+			return apierrors.NewBadRequest(err.Error())
 		}
 	}
 

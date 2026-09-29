@@ -14,7 +14,7 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/config: {{ include (print $.Template.BasePath "/config-secret.yaml") . | sha256sum }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -81,5 +81,5 @@ spec:
       {{- end }}
       volumes:
         - name: config
-          configMap:
-            name: {{ template "superphenix-api.fullname" . }}
+          secret:
+            secretName: {{ template "superphenix-api.fullname" . }}

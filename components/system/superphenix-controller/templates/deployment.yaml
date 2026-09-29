@@ -13,7 +13,7 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/config: {{ include (print $.Template.BasePath "/config-secret.yaml") . | sha256sum }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -74,8 +74,8 @@ spec:
       {{- end }}
       volumes:
         - name: config
-          configMap:
-            name: {{ template "superphenix-controller.fullname" . }}
+          secret:
+            secretName: {{ template "superphenix-controller.fullname" . }}
         {{- if .Values.webhook.enabled }}
         - name: webhook-cert
           secret:

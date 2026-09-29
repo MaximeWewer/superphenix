@@ -37,6 +37,11 @@ forceManual: false
 # any per-application `automation.cleanupOnDeletion` setting.
 cleanupOnDeletion: false
 
+# -- Allow rendering with the placeholder credentials of this file (Postgres
+# password, Kratos global secret). Only for local or test environments: they
+# are public.
+allowInsecureDefaults: false
+
 # -- Per-application settings. Each key defines an Argo CD Application that is
 # generated conditionally based on `enabled` and `modes` (see the README).
 apps:

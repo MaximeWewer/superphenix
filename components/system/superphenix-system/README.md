@@ -42,6 +42,7 @@ A handful of top-level values act as blast-radius controls over every generated 
 | `disableAll`         | Skip rendering every Application (useful for one-off maintenance).                                         |
 | `forceManual`        | Force `syncPolicy.automated.enabled = false` on every Application, regardless of per-app `automation.enabled`. |
 | `cleanupOnDeletion`  | Add the `resources-finalizer.argocd.argoproj.io` finalizer on every Application, forcing cascade delete.   |
+| `allowInsecureDefaults` | Allow rendering with the placeholder Postgres password and Kratos global secret. Only for local or test environments. |
 
 ### Version parity
 

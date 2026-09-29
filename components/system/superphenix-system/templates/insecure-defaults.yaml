@@ -1,0 +1,20 @@
+{{- /*
+Refuse to render with the placeholder credentials shipped in values.yaml. They
+are public (this repository), so a deployment that keeps them has a known
+database password and known Kratos signing secrets. Set
+`allowInsecureDefaults: true` only for local or test environments.
+*/ -}}
+{{- if not .Values.allowInsecureDefaults }}
+{{- $postgres := index .Values.apps "postgres" | default dict }}
+{{- if and $postgres (include "superphenix-system.shouldDeploy" (list $postgres $)) }}
+{{- if eq (toString ((($postgres.values).auth).password)) "changeme!" }}
+{{- fail "apps.postgres.values.auth.password still has the placeholder value: set a secret password, or allowInsecureDefaults: true for a test environment" }}
+{{- end }}
+{{- end }}
+{{- $kratos := index .Values.apps "kratos" | default dict }}
+{{- if and $kratos (include "superphenix-system.shouldDeploy" (list $kratos $)) }}
+{{- if eq (toString (($kratos.values).globalSecret)) "change-me-to-something-random-at-least-16-char-long" }}
+{{- fail "apps.kratos.values.globalSecret still has the placeholder value: set a random secret, or allowInsecureDefaults: true for a test environment" }}
+{{- end }}
+{{- end }}
+{{- end }}

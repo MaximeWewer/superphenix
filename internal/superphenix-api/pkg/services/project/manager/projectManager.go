@@ -8,6 +8,7 @@ import (
 	"github.com/super-phenix/superphenix/internal/superphenix-api/internal/consts"
 	"github.com/super-phenix/superphenix/internal/superphenix-api/internal/db/crud"
 	"github.com/super-phenix/superphenix/internal/superphenix-api/internal/db/model"
+	logger "github.com/super-phenix/superphenix/pkg/utils/log"
 
 	"github.com/rs/zerolog/log"
 	"gorm.io/gorm/clause"
@@ -25,7 +26,7 @@ func checkSuperAdminList(next http.Handler) http.Handler {
 		if authorization.IsSuperAdminUser(userId.(string)) {
 			log.Info().Ctx(r.Context()).
 				Str("method", "checkSuperAdminList").
-				Str("url", r.URL.String()).
+				Str("url", logger.RedactURL(r.URL)).
 				Str("userId", userId.(string)).
 				Msg("Check Project manager list")
 			next.ServeHTTP(w, r)

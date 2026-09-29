@@ -103,7 +103,7 @@ func (e *Service) Get(w http.ResponseWriter, r *http.Request) {
 		if canBypass {
 			log.Info().Ctx(r.Context()).
 				Str("method", "GetOrganization").
-				Str("url", r.URL.String()).
+				Str("url", logger.RedactURL(r.URL)).
 				Str("orgaId", orgaId).
 				Str("userId", userUuid.String()).
 				Msg("Fetch all project for organization")

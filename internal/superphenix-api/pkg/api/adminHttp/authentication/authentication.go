@@ -1,6 +1,7 @@
 package authentication
 
 import (
+	"crypto/subtle"
 	"net/http"
 )
 
@@ -8,7 +9,7 @@ import (
 func SecretAuth(authSecret string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if secret, ok := secretAuth(r); !ok || secret != authSecret {
+			if secret, ok := secretAuth(r); !ok || !secretMatches(secret, authSecret) {
 				secretAuthFailed(w)
 				return
 			}
@@ -28,4 +29,13 @@ func secretAuth(r *http.Request) (secret string, ok bool) {
 		return "", false
 	}
 	return auth, true
+}
+
+// secretMatches compares the presented secret with the configured one in
+// constant time. An empty configured secret never matches.
+func secretMatches(secret, expected string) bool {
+	if expected == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(secret), []byte(expected)) == 1
 }

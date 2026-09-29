@@ -10,6 +10,7 @@ import (
 	"github.com/super-phenix/superphenix/pkg/permify-wrapper/pkg/base/v1/entity"
 	pwV1 "github.com/super-phenix/superphenix/pkg/permify-wrapper/pkg/base/v1/permission"
 	pw "github.com/super-phenix/superphenix/pkg/permify-wrapper/pkg/permission"
+	logger "github.com/super-phenix/superphenix/pkg/utils/log"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
@@ -28,7 +29,7 @@ func CheckPermissionForRequest(r *http.Request, permission string) bool {
 	if IsSuperAdminUser(userId.(string)) {
 		log.Info().Ctx(r.Context()).
 			Str("method", "CheckPermission").
-			Str("url", r.URL.String()).
+			Str("url", logger.RedactURL(r.URL)).
 			Str("userId", userId.(string)).
 			Msgf("Bypass permission check for permission %s", permission)
 		return true

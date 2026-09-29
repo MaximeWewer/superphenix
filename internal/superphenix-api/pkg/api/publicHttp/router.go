@@ -48,7 +48,7 @@ import (
 // The organization service registers its own routes via its provider in pkg/server.
 func RegisterModules(cfg *config.Config, reg *router.Registry) {
 	reg.Use("request-id", middleware.RequestID)
-	reg.Use("logger", middleware.Logger)
+	reg.Use("logger", requestLogger)
 	reg.Use("recoverer", middleware.Recoverer)
 	// Before RealIP, which overwrites RemoteAddr.
 	reg.Use("peer-addr", audit.CapturePeerAddr)

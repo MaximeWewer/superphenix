@@ -86,13 +86,13 @@ func validate(w http.ResponseWriter, r *http.Request) (*http.Request, error) {
 
 	// Check if the user is active
 	if authenticatedToken.User.ID == uuid.Nil || authenticatedToken.User.DeletedAt.Valid || !authenticatedToken.User.IsActive {
-		log.Error().Any("token", authenticatedToken).Msg("API Token invalid")
+		log.Error().Str("tokenId", authenticatedToken.ID.String()).Msg("API Token invalid")
 		return r, errors.New("API Token invalid")
 	}
 
 	// Check if the api key is expired
 	if !authenticatedToken.ExpiresAt.IsZero() && authenticatedToken.ExpiresAt.Before(time.Now()) {
-		log.Error().Any("token", authenticatedToken).Msg("API Token expired")
+		log.Error().Str("tokenId", authenticatedToken.ID.String()).Msg("API Token expired")
 		return r, errors.New("API Token expired")
 	}
 

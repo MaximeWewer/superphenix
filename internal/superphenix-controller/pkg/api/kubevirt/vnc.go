@@ -183,7 +183,7 @@ func VNCEndpoint(router chi.Router) {
 			httpError.Http(w, r, http.StatusNotFound).Msg(http.StatusText(http.StatusNotFound))
 			return
 		}
-		l.Info().Msgf("Asking connection from : %s for [%s, %s]", r.RequestURI, namespace, effectiveId)
+		l.Info().Msgf("Asking connection from : %s for [%s, %s]", logger.RedactURL(r.URL), namespace, effectiveId)
 		VNCWS(w, r, namespace, effectiveId)
 	})
 }

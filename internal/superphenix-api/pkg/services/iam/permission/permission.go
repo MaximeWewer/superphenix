@@ -57,7 +57,7 @@ func (h *Service) ListPermissions(w http.ResponseWriter, r *http.Request) {
 	if canBypass {
 		log.Info().Ctx(r.Context()).
 			Str("method", "ListPermissions").
-			Str("url", r.URL.String()).
+			Str("url", logger.RedactURL(r.URL)).
 			Str("userId", userId.(string)).
 			Msg("Return full permission list")
 	}

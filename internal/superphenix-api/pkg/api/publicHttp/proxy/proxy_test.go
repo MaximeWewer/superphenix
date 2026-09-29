@@ -80,15 +80,16 @@ func TestReverseProxy(t *testing.T) {
 				rawUrl:  "http://100.81.3.17",
 				pattern: "/api/kubevirt",
 				proxyRequest: httputil.ProxyRequest{
-					In:  httptest.NewRequest(http.MethodGet, "/api/kubevirt/vm?bearer=token", nil),
-					Out: httptest.NewRequest(http.MethodGet, "/api/kubevirt/vm?bearer=token", nil),
+					In:  httptest.NewRequest(http.MethodGet, "/api/kubevirt/vm?follow=true&bearer=token", nil),
+					Out: httptest.NewRequest(http.MethodGet, "/api/kubevirt/vm?follow=true&bearer=token", nil),
 				}},
+			// The user's URL token is never forwarded to the controller.
 			want: want{
-				url:        "http://100.81.3.17/vm?bearer=token",
+				url:        "http://100.81.3.17/vm?follow=true",
 				urlScheme:  "http",
 				urlHost:    "100.81.3.17",
 				path:       "/vm",
-				requestURI: "/vm?bearer=token",
+				requestURI: "/vm?follow=true",
 			},
 			wantErr: false,
 		},

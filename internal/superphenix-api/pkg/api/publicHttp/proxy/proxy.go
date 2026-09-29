@@ -61,8 +61,12 @@ func ReverseProxy(rawUrl, pattern string, authSecret string) (httputil.ReversePr
 			if authSecret != "" {
 				r.Out.Header.Set(consts.AuthorizationHeader, fmt.Sprintf("Bearer %s", authSecret)) // Override the AuthorizationHeader if needed
 			}
-			r.Out.RequestURI = strings.Replace(r.Out.RequestURI, pattern, "", 1) // Include Path and QueryParam
-			r.Out.URL.Path = strings.Replace(r.Out.URL.Path, pattern, "", 1)     // Include only the path
+			// The controller authenticates the API with its own bearer: never
+			// forward the user's credentials (URL token, session cookies).
+			logger.StripSensitiveQuery(r.Out.URL)
+			r.Out.Header.Del("Cookie")
+			r.Out.URL.Path = strings.Replace(r.Out.URL.Path, pattern, "", 1) // Include only the path
+			r.Out.RequestURI = r.Out.URL.RequestURI()                        // Path and remaining query params
 		}}, nil
 }
 
@@ -164,6 +168,8 @@ func RewriteRequest(r *http.Request, rawUrl, pattern string) error {
 	}
 
 	rewriteRequestURL(r, target)
+	logger.StripSensitiveQuery(r.URL)
+	r.Header.Del("Cookie")
 	r.RequestURI = ""                                        // http.Client.Do doesn't allow request URI to be filled, so we need to empty it
 	r.URL.Path = strings.Replace(r.URL.Path, pattern, "", 1) // Include only the path
 	r.Host = target.Host                                     // Change the initial host to the new one

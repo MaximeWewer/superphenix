@@ -20,6 +20,12 @@ var (
 	FileNotFound = errors.New("couldn't find configuration file")
 )
 
+// GroupKind identifies a Kubernetes kind in configuration.
+type GroupKind struct {
+	Group string `yaml:"group"`
+	Kind  string `yaml:"kind"`
+}
+
 type RepoArgoAppConfig struct {
 	RepoURL        string `yaml:"repoURL"`
 	TargetRevision string `yaml:"targetRevision"`
@@ -171,6 +177,13 @@ type Config struct {
 		// default loading rules then in-cluster config.
 		Kubeconfig          string `yaml:"kubeconfig"`
 		AppProjectNamespace string `yaml:"appProjectNamespace"`
+
+		// AppProject configures the per-project Argo CD AppProjects.
+		AppProject struct {
+			// ClusterResourceWhitelist overrides the cluster-scoped kinds the
+			// project Applications may manage. Empty keeps the built-in list.
+			ClusterResourceWhitelist []GroupKind `yaml:"clusterResourceWhitelist"`
+		} `yaml:"appProject"`
 
 		GarbageCollection struct {
 			Enabled      bool          `yaml:"enabled"`

@@ -15,6 +15,7 @@ import (
 	pwClient "github.com/super-phenix/superphenix/pkg/permify-wrapper/pkg/client"
 
 	"github.com/rs/zerolog/log"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -66,25 +67,56 @@ func ProvideInfra(cfg *config.Config) error {
 // shared client. A cluster connection is required.
 func ProvideArgo(cfg *config.Config) *argo.Client {
 	argoOnce.Do(func() {
-		gc := cfg.ArgoController.GarbageCollection
-		client, err := argo.NewClientFromKubeconfig(argo.Options{
-			Kubeconfig:          cfg.ArgoController.Kubeconfig,
-			AppProjectNamespace: cfg.ArgoController.AppProjectNamespace,
-			GC: argo.GCOptions{
-				Enabled:      gc.Enabled,
-				Interval:     gc.Interval,
-				Timeout:      gc.Timeout,
-				Delay:        gc.Delay,
-				LabelMarkKey: gc.LabelMarkKey,
-				Debug:        gc.Debug,
-			},
-		})
+		client, err := argo.NewClientFromKubeconfig(argoOptions(cfg))
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to connect the Argo client")
 		}
 		argoClient = client
 	})
 	return argoClient
+}
+
+// argoOptions maps the configuration onto the Argo client options.
+func argoOptions(cfg *config.Config) argo.Options {
+	gc := cfg.ArgoController.GarbageCollection
+	whitelist := make([]metav1.GroupKind, 0, len(cfg.ArgoController.AppProject.ClusterResourceWhitelist))
+	for _, gk := range cfg.ArgoController.AppProject.ClusterResourceWhitelist {
+		whitelist = append(whitelist, metav1.GroupKind{Group: gk.Group, Kind: gk.Kind})
+	}
+	return argo.Options{
+		Kubeconfig:               cfg.ArgoController.Kubeconfig,
+		AppProjectNamespace:      cfg.ArgoController.AppProjectNamespace,
+		ClusterResourceWhitelist: whitelist,
+		GC: argo.GCOptions{
+			Enabled:      gc.Enabled,
+			Interval:     gc.Interval,
+			Timeout:      gc.Timeout,
+			Delay:        gc.Delay,
+			LabelMarkKey: gc.LabelMarkKey,
+			Debug:        gc.Debug,
+		},
+	}
+}
+
+// ReconcileAppProjects applies the AppProject cluster resource whitelist to
+// the AppProjects of existing projects, in the background. It never blocks or
+// stops the boot: without a cluster it only logs.
+func ReconcileAppProjects(ctx context.Context, cfg *config.Config) {
+	go func() {
+		client, err := argo.NewClientFromKubeconfig(argoOptions(cfg))
+		if err != nil {
+			log.Warn().Err(err).Msg("No cluster connection, app projects not reconciled")
+			return
+		}
+		updated, err := client.ReconcileAppProjects(ctx)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to reconcile app projects")
+			return
+		}
+		if updated > 0 {
+			log.Info().Int("updated", updated).Msg("Restricted cluster resources of existing app projects")
+		}
+	}()
 }
 
 // StartGarbageCollection runs the Argo garbage collection sweep in the

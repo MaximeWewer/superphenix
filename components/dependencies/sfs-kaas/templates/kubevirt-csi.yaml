@@ -67,40 +67,6 @@ subjects:
   name: kvcsi-{{ $clusterID }}
 
 ---
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: kvcsi-{{ $clusterID }}
-  labels:
-    {{- include "sfs-kaas.labels" $ | nindent 4 }}
-    superphenix.net/resourceEffectiveID: {{ $clusterID | quote }}
-    superphenix.net/resourceLocalID: {{ $kvcsiLocalID | quote }}
-    superphenix.net/resourceName: {{ $kvcsiLocalID | quote }}
-rules:
-- apiGroups: [""]
-  resources: ["persistentvolumes"]
-  verbs: ["get"]
-
----
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: kvcsi-{{ $clusterID }}
-  labels:
-    {{- include "sfs-kaas.labels" $ | nindent 4 }}
-    superphenix.net/resourceEffectiveID: {{ $clusterID | quote }}
-    superphenix.net/resourceLocalID: {{ $kvcsiLocalID | quote }}
-    superphenix.net/resourceName: {{ $kvcsiLocalID | quote }}
-roleRef:
-  kind: ClusterRole
-  name: kvcsi-{{ $clusterID }}
-  apiGroup: rbac.authorization.k8s.io
-subjects:
-- kind: ServiceAccount
-  name: kvcsi-{{ $clusterID }}
-  namespace: {{ $.Release.Namespace }}
-
----
 apiVersion: v1
 kind: ConfigMap
 metadata:

@@ -3,6 +3,8 @@ package argo
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 
 	logger "github.com/super-phenix/superphenix/pkg/utils/log"
 
@@ -15,6 +17,37 @@ import (
 
 // ensureAppProject creates the project's AppProject, or reconciles the spec of an
 // existing one so a prefix/destination change is picked up.
+// DefaultClusterResourceWhitelist lists the cluster-scoped kinds the
+// Applications of a project may manage: the Kube-OVN network objects and the
+// namespace rendered by sfs-iaas, and the Kamaji DataStore of sfs-kaas.
+//
+// The project's Applications include the tenant GitOps application, whose
+// manifests come from a repository the tenant controls. Kinds that grant
+// cluster-wide power (RBAC, admission policies and webhooks, CRDs,
+// PersistentVolumes, StorageClasses...) must never be listed here: the
+// platform provides what the tenant charts need (see the kaas-controller
+// chart).
+var DefaultClusterResourceWhitelist = []metav1.GroupKind{
+	{Group: "", Kind: "Namespace"},
+	{Group: "kubeovn.io", Kind: "Vpc"},
+	{Group: "kubeovn.io", Kind: "Subnet"},
+	{Group: "kubeovn.io", Kind: "VpcNatGateway"},
+	{Group: "kubeovn.io", Kind: "IptablesEIP"},
+	{Group: "kubeovn.io", Kind: "IptablesFIPRule"},
+	{Group: "kubeovn.io", Kind: "IptablesSnatRule"},
+	{Group: "kubeovn.io", Kind: "IptablesDnatRule"},
+	{Group: "kubeovn.io", Kind: "SwitchLBRule"},
+	{Group: "kamaji.clastix.io", Kind: "DataStore"},
+}
+
+// clusterResourceWhitelist returns the configured whitelist, or the default.
+func (c *Client) clusterResourceWhitelist() []metav1.GroupKind {
+	if len(c.opts.ClusterResourceWhitelist) > 0 {
+		return c.opts.ClusterResourceWhitelist
+	}
+	return DefaultClusterResourceWhitelist
+}
+
 func (c *Client) ensureAppProject(ctx context.Context, orgaId, projectId string) error {
 	log := logger.GetLogger(ctx)
 	namespace := c.Namespace(projectId)
@@ -41,7 +74,7 @@ func (c *Client) ensureAppProject(ctx context.Context, orgaId, projectId string)
 			// Only Applications deployed in this namespace can use this Project
 			SourceNamespaces:         []string{name},
 			SourceRepos:              []string{"*"},
-			ClusterResourceWhitelist: []metav1.GroupKind{{Group: "*", Kind: "*"}},
+			ClusterResourceWhitelist: c.clusterResourceWhitelist(),
 			Description:              fmt.Sprintf("Project to deploy Superphénix resources in project spx-%s", projectId),
 			//  Only permit applications to deploy to Superphenix clusters in their project namespace
 			Destinations: []v1alpha1.ApplicationDestination{
@@ -84,4 +117,35 @@ func (c *Client) updateAppProject(ctx context.Context, appProject *v1alpha1.AppP
 		return err
 	}
 	return nil
+}
+
+// ReconcileAppProjects realigns the cluster resource whitelist of every
+// existing project AppProject, so that a restriction also applies to projects
+// created before it. It returns the number of AppProjects updated.
+func (c *Client) ReconcileAppProjects(ctx context.Context) (int, error) {
+	log := logger.GetLogger(ctx)
+	whitelist := c.clusterResourceWhitelist()
+
+	projects, err := c.apps.AppProjects(c.opts.AppProjectNamespace).List(ctx, metav1.ListOptions{
+		LabelSelector: spxId.SpxLabelProjectID,
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	updated := 0
+	for i := range projects.Items {
+		project := &projects.Items[i]
+		if !strings.HasPrefix(project.Name, "spx-") || slices.Equal(project.Spec.ClusterResourceWhitelist, whitelist) {
+			continue
+		}
+
+		project.Spec.ClusterResourceWhitelist = whitelist
+		if _, err := c.apps.AppProjects(c.opts.AppProjectNamespace).Update(ctx, project, metav1.UpdateOptions{}); err != nil {
+			log.Warn().Err(err).Str("name", project.Name).Msg("Failed to restrict app project")
+			continue
+		}
+		updated++
+	}
+	return updated, nil
 }

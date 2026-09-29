@@ -73,6 +73,12 @@ serviceMonitor:
 #     argoController:
 #       kubeconfig: ""                       # empty = in-cluster
 #       appProjectNamespace: superphenix-system
+#       appProject:
+#         # Cluster-scoped kinds the per-project Applications may manage. Empty
+#         # keeps the built-in list (Namespace, Kube-OVN network objects, Kamaji
+#         # DataStore). Never add RBAC or admission kinds: the tenant GitOps
+#         # application uses this AppProject with a repository the tenant owns.
+#         clusterResourceWhitelist: []
 #       garbageCollection:
 #         enabled: true                      # only one replica sweeps (advisory lock)
 #         interval: 15m

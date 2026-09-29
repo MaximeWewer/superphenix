@@ -141,3 +141,58 @@ metadata:
   name: kaas-pvc-hp-subnet
 spec:
   policyName: kaas-pvc-hp-subnet
+
+---
+# === Add SPX labels to the secrets generated for KaaS clusters (Kamaji, CAPI)
+# Required for resource selection (backups). The labels are copied from the
+# project namespace: tenant charts no longer ship their own admission policy.
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: MutatingAdmissionPolicy
+metadata:
+  name: kaas-secret-labels-map
+spec:
+  matchConstraints:
+    matchPolicy: Equivalent
+    namespaceSelector:
+      matchExpressions:
+      - key: superphenix.net/organizationID
+        operator: Exists
+    objectSelector: {}
+    resourceRules:
+    - apiGroups:   [""]
+      apiVersions: ["v1"]
+      operations:  ["CREATE","UPDATE"]
+      resources:   ["secrets"]
+      scope: 'Namespaced'
+  matchConditions:
+    - name: match-project-namespace
+      expression: 'namespaceObject != null && namespaceObject.metadata.name.startsWith("spx-") && has(namespaceObject.metadata.labels) && "superphenix.net/organizationID" in namespaceObject.metadata.labels'
+    - name: match-kamaji-or-capi
+      expression: 'has(object.metadata.labels) && ("kamaji.clastix.io/name" in object.metadata.labels || "cluster.x-k8s.io/cluster-name" in object.metadata.labels)'
+  failurePolicy: Fail
+  reinvocationPolicy: IfNeeded
+  mutations:
+    - patchType: "JSONPatch"
+      jsonPatch:
+        expression: >
+          [
+            JSONPatch{
+              op: "add",
+              path: "/metadata/labels/" + jsonpatch.escapeKey("superphenix.net/organizationID"),
+              value: namespaceObject.metadata.labels["superphenix.net/organizationID"]
+            },
+            JSONPatch{
+              op: "add",
+              path: "/metadata/labels/" + jsonpatch.escapeKey("superphenix.net/projectID"),
+              value: namespaceObject.metadata.name
+            }
+          ]
+
+---
+# === Binding for the MutatingAdmissionPolicy above
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: MutatingAdmissionPolicyBinding
+metadata:
+  name: kaas-secret-labels-map
+spec:
+  policyName: kaas-secret-labels-map

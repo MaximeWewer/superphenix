@@ -64,10 +64,11 @@ workload cluster's storage solution.
 - ServiceAccount
 - Role
 - RoleBinding
-- ClusterRole *(not namespaced)*
-- ClusterRoleBinding *(not namespaced)*
 - ConfigMap
 - Deployment
+
+Read access to PersistentVolumes (cluster-scoped) is granted once by the `kaas-controller`
+chart, not by this chart: the project's Argo CD AppProject does not allow RBAC objects.
 
 ## Tenant setup job
 

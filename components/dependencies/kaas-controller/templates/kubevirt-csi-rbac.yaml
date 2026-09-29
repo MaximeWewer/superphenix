@@ -1,0 +1,32 @@
+---
+# === Cluster-scoped read access for the KubeVirt CSI controllers of KaaS clusters
+# The per-cluster kvcsi ServiceAccounts (sfs-kaas) need to read PersistentVolumes,
+# which are cluster-scoped. Tenant charts are not allowed to create RBAC objects,
+# so the access is granted here once. It is limited to "get": a PersistentVolume
+# can only be read by its exact name, never listed or watched.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kaas-kvcsi-pv-reader
+  labels:
+    {{- include "kaas-controller.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: ["persistentvolumes"]
+  verbs: ["get"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kaas-kvcsi-pv-reader
+  labels:
+    {{- include "kaas-controller.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kaas-kvcsi-pv-reader
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: system:serviceaccounts

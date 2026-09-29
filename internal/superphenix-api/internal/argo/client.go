@@ -10,6 +10,7 @@ import (
 	spxId "github.com/super-phenix/superphenix/pkg/superphenix-id"
 
 	"github.com/argoproj/argo-cd/v3/pkg/client/clientset/versioned/typed/application/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -31,7 +32,10 @@ type Options struct {
 	// (KUBECONFIG, ~/.kube/config) then in-cluster config.
 	Kubeconfig          string
 	AppProjectNamespace string
-	GC                  GCOptions
+	// ClusterResourceWhitelist overrides DefaultClusterResourceWhitelist for the
+	// per-project AppProjects. Empty means the default.
+	ClusterResourceWhitelist []metav1.GroupKind
+	GC                       GCOptions
 }
 
 // Client wraps the Argo CD and Kubernetes clientsets. A nil *Client is a

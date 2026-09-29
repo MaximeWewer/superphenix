@@ -37,6 +37,7 @@ import (
 	"github.com/super-phenix/superphenix/internal/superphenix-api/pkg/metrics"
 	"github.com/super-phenix/superphenix/internal/superphenix-api/pkg/opentelemetry/tracing"
 	"github.com/super-phenix/superphenix/internal/superphenix-api/pkg/router"
+	ch "github.com/super-phenix/superphenix/pkg/chi-helper"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -53,6 +54,9 @@ func RegisterModules(cfg *config.Config, reg *router.Registry) {
 	// Before RealIP, which overwrites RemoteAddr.
 	reg.Use("peer-addr", audit.CapturePeerAddr)
 	reg.Use("real-ip", middleware.RealIP)
+	// Encoded separators and dot segments in a path parameter would change the
+	// organization or project targeted once the request is proxied to a controller.
+	reg.Use("reject-ambiguous-path", ch.RejectAmbiguousPath)
 	reg.Use("clean-path", middleware.CleanPath)
 	reg.Use("tracing", tracing.MiddlewareHTTP)
 	reg.Use("metrics", metrics.MiddlewareHTTP)

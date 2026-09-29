@@ -62,7 +62,7 @@ func ReverseProxy(rawUrl, pattern string, authSecret string) (httputil.ReversePr
 				r.Out.Header.Set(consts.AuthorizationHeader, fmt.Sprintf("Bearer %s", authSecret)) // Override the AuthorizationHeader if needed
 			}
 			r.Out.RequestURI = strings.Replace(r.Out.RequestURI, pattern, "", 1) // Include Path and QueryParam
-			r.Out.URL.Path = strings.Replace(r.Out.URL.Path, pattern, "", 1)     // Include only the path
+			stripPattern(r.Out.URL, pattern)
 		}}, nil
 }
 
@@ -164,10 +164,21 @@ func RewriteRequest(r *http.Request, rawUrl, pattern string) error {
 	}
 
 	rewriteRequestURL(r, target)
-	r.RequestURI = ""                                        // http.Client.Do doesn't allow request URI to be filled, so we need to empty it
-	r.URL.Path = strings.Replace(r.URL.Path, pattern, "", 1) // Include only the path
-	r.Host = target.Host                                     // Change the initial host to the new one
+	r.RequestURI = "" // http.Client.Do doesn't allow request URI to be filled, so we need to empty it
+	stripPattern(r.URL, pattern)
+	r.Host = target.Host // Change the initial host to the new one
 	return nil
+}
+
+// stripPattern removes pattern from both the decoded and the escaped path.
+// Rewriting only Path would leave a RawPath that no longer matches it: Go then
+// sends the decoded path, and encoded separators in a path parameter would turn
+// into real ones on the controller side.
+func stripPattern(u *url.URL, pattern string) {
+	u.Path = strings.Replace(u.Path, pattern, "", 1)
+	if u.RawPath != "" {
+		u.RawPath = strings.Replace(u.RawPath, pattern, "", 1)
+	}
 }
 
 // rewriteRequestURL override request url with target

@@ -18,6 +18,7 @@ import (
 	"github.com/super-phenix/superphenix/internal/superphenix-controller/pkg/config"
 	"github.com/super-phenix/superphenix/internal/superphenix-controller/pkg/metrics"
 	"github.com/super-phenix/superphenix/internal/superphenix-controller/pkg/opentelemetry/tracing"
+	ch "github.com/super-phenix/superphenix/pkg/chi-helper"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -48,6 +49,8 @@ func LaunchEndpoint(address string) {
 	router.Use(middleware.RequestID)
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.RealIP)
+	// Refuse encoded separators and dot segments before CleanPath can resolve them.
+	router.Use(ch.RejectAmbiguousPath)
 	router.Use(middleware.CleanPath)
 	router.Use(utils.AddUserToContext)
 	router.Use(customMw.RequestLogger)

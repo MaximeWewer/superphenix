@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/super-phenix/superphenix/internal/superphenix-controller/pkg/config"
 	httpError "github.com/super-phenix/superphenix/pkg/utils/error"
 	logger "github.com/super-phenix/superphenix/pkg/utils/log"
+
+	spxId "github.com/super-phenix/superphenix/pkg/superphenix-id"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -52,4 +55,16 @@ func RetrieveNamespaceAndEid(w http.ResponseWriter, r *http.Request) (string, st
 	}
 
 	return namespace, effectiveId, nil
+}
+
+// CheckBodyMatchesPath refuses a request body whose organization or project
+// differs from the ones of the URL. Create handlers build the Kubernetes
+// objects from the body metadata: the API sets it from the validated path
+// today, and this keeps the controller safe on its own.
+func CheckBodyMatchesPath(r *http.Request, m spxId.Metadata) error {
+	norm := func(id string) string { return strings.TrimPrefix(id, spxId.FrameworkPrefix()+"-") }
+	if norm(m.OrgId) != norm(chi.URLParam(r, "orgId")) || norm(m.ProjectId) != norm(chi.URLParam(r, "projectId")) {
+		return fmt.Errorf("the organization or project of the body does not match the URL")
+	}
+	return nil
 }

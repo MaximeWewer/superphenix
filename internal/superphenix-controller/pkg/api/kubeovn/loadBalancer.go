@@ -169,6 +169,11 @@ func createLoadBalancer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := utils.CheckBodyMatchesPath(r, body.Metadata); err != nil {
+		log.Warn().Err(err).Msg("Creation refused")
+		httpError.Http(w, r, http.StatusBadRequest).Msg(err.Error())
+		return
+	}
 	err = body.CreateLoadBalancer(r.Context())
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create load balancer")

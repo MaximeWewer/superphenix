@@ -186,6 +186,11 @@ func createNetPol(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := utils.CheckBodyMatchesPath(r, body.Metadata); err != nil {
+		log.Warn().Err(err).Msg("Creation refused")
+		httpError.Http(w, r, http.StatusBadRequest).Msg(err.Error())
+		return
+	}
 	err = body.CreateNetPol(r.Context(), namespace)
 	if err != nil {
 		if stderrors.Is(err, netpol.ErrUnknownSubnet) || stderrors.Is(err, netpol.ErrTooManySubnets) {

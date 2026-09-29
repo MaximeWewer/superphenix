@@ -196,6 +196,11 @@ func createEIP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := utils.CheckBodyMatchesPath(r, body.Metadata); err != nil {
+		log.Warn().Err(err).Msg("Creation refused")
+		httpError.Http(w, r, http.StatusBadRequest).Msg(err.Error())
+		return
+	}
 	err = body.CreateEip(r.Context())
 	if errors.IsNotFound(err) {
 		log.Warn().Err(err).Msg("Subnet not found in project")

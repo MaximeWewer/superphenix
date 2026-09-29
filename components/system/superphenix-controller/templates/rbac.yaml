@@ -88,6 +88,15 @@ rules:
       - patch
       - delete
       - watch
+  # Read the IP allocations to check that addresses targeted on a shared
+  # subnet belong to the requesting project.
+  - apiGroups:
+      - kubeovn.io
+    resources:
+      - ips
+    verbs:
+      - get
+      - list
   - apiGroups:
       - k8s.cni.cncf.io
     resources:

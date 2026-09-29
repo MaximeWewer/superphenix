@@ -63,8 +63,14 @@ func (s *UpdateEIPInfo) UpdateEip(ctx context.Context, namespace, name string) e
 	var targetsErr error
 	if s.Spec.InternalIP != "" {
 		targetsErr = validateInternalTargets(subnet.Spec.CIDRBlock, s.Spec.InternalIP, nil, nil)
+		if targetsErr == nil {
+			targetsErr = validateSharedSubnetTargets(ctx, subnet, namespace, s.Spec.InternalIP, nil, nil)
+		}
 	} else {
 		targetsErr = validateInternalTargets(subnet.Spec.CIDRBlock, "", s.Spec.SNAT, s.Spec.DNAT)
+		if targetsErr == nil {
+			targetsErr = validateSharedSubnetTargets(ctx, subnet, namespace, "", s.Spec.SNAT, s.Spec.DNAT)
+		}
 	}
 	if err := targetsErr; err != nil {
 		log.Warn().Err(err).Str("subnet", eip.Spec.NatGwDp).Msg("EIP update refused: internal target outside subnet")

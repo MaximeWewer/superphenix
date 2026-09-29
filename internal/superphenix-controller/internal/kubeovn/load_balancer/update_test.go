@@ -32,6 +32,10 @@ func TestUpdateLoadBalancer_EndpointIPv4Validation(t *testing.T) {
 		{name: "garbage endpoint rejected", endpoints: []string{"not-an-ip"}, wantErr: true},
 		{name: "empty endpoint rejected", endpoints: []string{""}, wantErr: true},
 		{name: "one invalid among valid rejected", endpoints: []string{"10.0.0.1", "bad"}, wantErr: true},
+		{name: "endpoint of the project on a shared subnet", endpoints: []string{"10.50.0.10"}, wantErr: false},
+		{name: "endpoint of the owner on a shared subnet rejected", endpoints: []string{"10.50.0.20"}, wantErr: true},
+		{name: "endpoint in another project's subnet rejected", endpoints: []string{"10.60.0.5"}, wantErr: true},
+		{name: "endpoint outside the project subnets rejected", endpoints: []string{"172.16.0.1"}, wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -46,6 +50,7 @@ func TestUpdateLoadBalancer_EndpointIPv4Validation(t *testing.T) {
 			}
 			client := testhelper.NewFakeKubeOvnClientset()
 			config.KubeOvnClient = client
+			seedProjectNetwork(t, client, namespace)
 			if _, err := client.KubeovnV1().SwitchLBRules().Create(context.Background(), existing, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("failed to seed existing load balancer: %v", err)
 			}

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/super-phenix/superphenix/internal/superphenix-controller/internal/kubeovn/eip/dnat"
+	"github.com/super-phenix/superphenix/internal/superphenix-controller/internal/kubeovn/subnetaccess"
 	"github.com/super-phenix/superphenix/internal/superphenix-controller/internal/utils"
 	k8s "github.com/super-phenix/superphenix/internal/superphenix-controller/pkg/config"
 
@@ -98,4 +99,39 @@ func checkCIDRInSubnet(subnetCIDR, cidr string) error {
 	}
 
 	return apierrors.NewBadRequest(fmt.Sprintf("SNAT CIDR %q is not in the subnet", cidr))
+}
+
+// validateSharedSubnetTargets restricts the targets of an EIP bound to a subnet
+// that is only shared with the project: the subnet also hosts the owner's
+// workloads, so SNAT may only use single addresses and every target must be
+// allocated to one of the project's pods or VMs. It does nothing on a subnet
+// the project owns.
+func validateSharedSubnetTargets(ctx context.Context, subnet *v1.Subnet, projectID, internalIP string, snatCIDRs []string, dnatRules []dnat.InfoDNAT) error {
+	if subnetaccess.IsOwnedBy(subnet, projectID) {
+		return nil
+	}
+
+	var ips []string
+	if internalIP != "" {
+		ips = append(ips, internalIP)
+	}
+	for _, entry := range snatCIDRs {
+		entry = strings.TrimSpace(entry)
+		if strings.Contains(entry, "/") {
+			_, network, err := net.ParseCIDR(entry)
+			if err != nil {
+				return apierrors.NewBadRequest(fmt.Sprintf("SNAT CIDR %q is invalid", entry))
+			}
+			if ones, bits := network.Mask.Size(); ones != bits {
+				return apierrors.NewBadRequest(fmt.Sprintf("SNAT CIDR %q: only single addresses are allowed on a shared subnet", entry))
+			}
+			entry = network.IP.String()
+		}
+		ips = append(ips, entry)
+	}
+	for _, rule := range dnatRules {
+		ips = append(ips, rule.InternalIP)
+	}
+
+	return subnetaccess.CheckAllocatedToProject(ctx, subnet.Name, projectID, ips)
 }

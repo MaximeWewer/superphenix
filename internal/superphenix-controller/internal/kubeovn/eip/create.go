@@ -63,12 +63,18 @@ func (s *CreateEIPInfo) CreateEip(ctx context.Context) error {
 	var targetsErr error
 	if s.Spec.InternalIP != "" {
 		targetsErr = validateInternalTargets(subnet.Spec.CIDRBlock, s.Spec.InternalIP, nil, nil)
+		if targetsErr == nil {
+			targetsErr = validateSharedSubnetTargets(ctx, subnet, s.GetProjectID(), s.Spec.InternalIP, nil, nil)
+		}
 	} else {
 		dnatRules := make([]dnat.InfoDNAT, 0, len(s.Spec.DNAT))
 		for _, rule := range s.Spec.DNAT {
 			dnatRules = append(dnatRules, dnat.InfoDNAT(rule))
 		}
 		targetsErr = validateInternalTargets(subnet.Spec.CIDRBlock, "", s.Spec.SNAT, dnatRules)
+		if targetsErr == nil {
+			targetsErr = validateSharedSubnetTargets(ctx, subnet, s.GetProjectID(), "", s.Spec.SNAT, dnatRules)
+		}
 	}
 	if err := targetsErr; err != nil {
 		log.Warn().Err(err).Str("subnet", s.General.SubnetEId).Msg("EIP creation refused: internal target outside subnet")

@@ -6,6 +6,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/super-phenix/superphenix/internal/superphenix-controller/internal/kubeovn/subnetaccess"
 	"github.com/super-phenix/superphenix/internal/superphenix-controller/internal/utils"
 	"github.com/super-phenix/superphenix/internal/superphenix-controller/pkg/config"
 	logger "github.com/super-phenix/superphenix/pkg/utils/log"
@@ -62,6 +63,7 @@ func (info *CreateLoadBalancerInfo) CreateLoadBalancer(ctx context.Context) erro
 		labelsSelector, err := utils.ParseLabels(info.Selectors, "")
 		if err != nil {
 			log.Err(err).Msg("Error parsing selectors")
+			return err
 		}
 		//	Build selector
 		for key, value := range labelsSelector {
@@ -77,6 +79,12 @@ func (info *CreateLoadBalancerInfo) CreateLoadBalancer(ctx context.Context) erro
 				log.Err(err).Any("info", info).Msg("Error parsing creation values - endpoints invalid")
 				return err
 			}
+		}
+		// Endpoints must lie in a subnet of the project; on a subnet only
+		// shared with the project they must belong to its own workloads.
+		if err := subnetaccess.CheckTargets(ctx, info.GetProjectID(), endpoints); err != nil {
+			log.Warn().Err(err).Any("info", info).Msg("Load balancer endpoint refused")
+			return err
 		}
 	}
 

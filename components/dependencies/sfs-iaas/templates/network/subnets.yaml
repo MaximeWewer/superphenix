@@ -99,9 +99,6 @@ spec:
   vpc: {{ $vpcID | quote }}
   subnet: {{ $subnetID | quote }}
   lanIp: {{ $natGateway.lanIP | quote }}
-  {{- with $natGateway.tolerations }}
-  tolerations: {{ . | toYaml | nindent 2 }}
-  {{- end }}
   externalSubnets:
     - spx-internal-bgp
   # Add a static route to redirect traffic headed for loadbalancers (198.18.0.0/16) to the gateway
@@ -109,32 +106,9 @@ spec:
   routes:
     - cidr: 198.18.0.0/16
       nextHopIP: gateway
-  {{- if $natGateway.bgpSpeaker }}
-  {{- with $natGateway.bgpSpeaker }}
-  bgpSpeaker:
-    enabled: {{ .enabled }}
-    asn: {{ .asn }}
-    remoteAsn: {{ .remoteAsn }}
-    neighbors: {{ .neighbors }}
-    {{- with .enableGracefulRestart }}
-    enableGracefulRestart: {{ . }}
-    {{- end }}
-    {{- with .routerId }}
-    routerId: {{ . | quote }}
-    {{- end }}
-    {{- with .holdTime }}
-    holdTime: {{ . | quote }}
-    {{- end }}
-    {{- with .password }}
-    password: {{ . | quote }}
-    {{- end }}
-    {{- with .extraArgs }}
-    extraArgs: {{ . | toYaml | nindent 4 }}
-    {{- end }}
-  {{- end }}
-  {{- else }}
+  # BGP settings and scheduling of the NAT gateway are platform settings: they
+  # always come from the AZ configuration, never from per-subnet values.
   bgpSpeaker: {{ $.Values.bgpSpeaker | trimPrefix "'" | trimSuffix "'" | fromJson | toYaml | nindent 4 }}
-  {{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

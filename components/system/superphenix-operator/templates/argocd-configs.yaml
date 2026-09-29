@@ -87,12 +87,40 @@ data:
               command:
                 - bash
                 - "-c"
-                - set -e && set -o pipefail && /clone.sh $ARGOCD_ENV_REPO
+                - set -e && set -o pipefail && /clone.sh "$ARGOCD_ENV_REPO"
             generate:
+              # HELM_PARAMS and HELM_VALUEFILES hold several arguments and are split on
+              # whitespace on purpose. Every flag is checked against an allow-list so that
+              # the environment of an Application cannot pass other helm options (e.g.
+              # --post-renderer, which runs a binary), and value files must be relative
+              # paths inside the repository. Every other value is quoted.
               command:
                 - bash
                 - "-c"
-                - set -e && set -o pipefail && helm template $ARGOCD_ENV_RELEASE --include-crds -n $ARGOCD_APP_NAMESPACE ${ARGOCD_ENV_HELM_PARAMS} ${ARGOCD_ENV_HELM_VALUEFILES} -f <(echo "$ARGOCD_ENV_HELM_VALUES") . | /parser.sh
+                - |
+                  set -e -o pipefail
+                  read -r -a params <<< "${ARGOCD_ENV_HELM_PARAMS:-}"
+                  read -r -a valuefiles <<< "${ARGOCD_ENV_HELM_VALUEFILES:-}"
+                  expect_value=""
+                  for arg in "${params[@]}" "${valuefiles[@]}"; do
+                    if [ -n "$expect_value" ]; then
+                      case "$arg" in -*) echo "missing value for $expect_value" >&2; exit 1 ;; esac
+                      if [ "$expect_value" = "file" ]; then
+                        case "$arg" in /*|*..*) echo "value file must be a relative path: $arg" >&2; exit 1 ;; esac
+                      fi
+                      expect_value=""
+                      continue
+                    fi
+                    case "$arg" in
+                      --set|--set-string) expect_value="set" ;;
+                      -f|--values) expect_value="file" ;;
+                      *) echo "helm argument not allowed: $arg" >&2; exit 1 ;;
+                    esac
+                  done
+                  if [ -n "$expect_value" ]; then echo "missing value for the last flag" >&2; exit 1; fi
+                  case "$ARGOCD_ENV_RELEASE" in -*|"") echo "invalid release name" >&2; exit 1 ;; esac
+                  helm template "$ARGOCD_ENV_RELEASE" --include-crds -n "$ARGOCD_APP_NAMESPACE" \
+                    "${params[@]}" "${valuefiles[@]}" -f <(printf '%s\n' "$ARGOCD_ENV_HELM_VALUES") . | /parser.sh
 
       # Parameters injected to ArgoCD
       params:

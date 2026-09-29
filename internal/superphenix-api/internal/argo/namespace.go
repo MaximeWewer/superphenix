@@ -2,6 +2,7 @@ package argo
 
 import (
 	"context"
+	"maps"
 
 	logger "github.com/super-phenix/superphenix/pkg/utils/log"
 
@@ -22,9 +23,14 @@ func (c *Client) ensureNamespace(ctx context.Context, orgaId, projectId string) 
 		ProjectId: projectId,
 	}
 
+	labels := m.GetLabels()
+	// Tenant workloads run under the baseline Pod Security Standard; restricted
+	// violations are reported. KubeVirt virt-launcher pods are compatible
+	// with baseline.
+	maps.Copy(labels, spxId.PodSecurityLabels())
 	nsSpec := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{
 		Name:   namespace,
-		Labels: m.GetLabels(),
+		Labels: labels,
 	}}
 
 	if _, err := c.k8s.CoreV1().Namespaces().Create(ctx, nsSpec, metav1.CreateOptions{}); err != nil {

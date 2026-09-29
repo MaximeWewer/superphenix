@@ -127,10 +127,28 @@ spec:
         superphenix.net/workloadClass: kaas-essentials-job
     spec:
       restartPolicy: Never
+      # The job only talks to the tenant cluster through the mounted kubeconfig:
+      # it needs no token of the management cluster, nor root.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: post-install-job
           image: "alpine/helm:3.19"
           command: ["/job/script/essentials.sh"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: HOME
+              value: /tmp
           volumeMounts:
             - name: script
               mountPath: /job/script
@@ -138,6 +156,10 @@ spec:
               mountPath: /job
             - name: values
               mountPath: /job/values
+            - name: tmp
+              mountPath: /tmp
+            - name: run
+              mountPath: /var/run
       volumes:
         - name: script
           configMap:
@@ -160,6 +182,10 @@ spec:
             items:
             - key: "values.yaml"
               path: "values.yaml"
+        - name: tmp
+          emptyDir: {}
+        - name: run
+          emptyDir: {}
 
 {{- end }}
 {{- end }}

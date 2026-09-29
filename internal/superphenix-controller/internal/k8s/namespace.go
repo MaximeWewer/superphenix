@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"context"
+	"maps"
 
 	"github.com/super-phenix/superphenix/internal/superphenix-controller/pkg/api/utils"
 	"github.com/super-phenix/superphenix/internal/superphenix-controller/pkg/config"
@@ -23,9 +24,14 @@ func CreateNamespaceIfNotExists(ctx context.Context, orgaId, projectId string) e
 		ProjectId: projectId,
 	}
 
+	labels := m.GetLabels()
+	// Tenant workloads run under the baseline Pod Security Standard; restricted
+	// violations are reported. KubeVirt virt-launcher pods are compatible
+	// with baseline.
+	maps.Copy(labels, spxId.PodSecurityLabels())
 	nsSpec := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{
 		Name:   namespace,
-		Labels: m.GetLabels(),
+		Labels: labels,
 	}}
 
 	_, err := config.K8sClient.CoreV1().Namespaces().Create(ctx, nsSpec, metav1.CreateOptions{})

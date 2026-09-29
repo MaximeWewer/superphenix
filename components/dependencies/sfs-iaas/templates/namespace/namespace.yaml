@@ -1,8 +1,21 @@
+{{- /*
+Pod Security Admission labels are fixed by the chart: any pod-security label
+coming from global.labels is dropped, so values cannot lower the level.
+*/ -}}
+{{- $labels := include "sfs-iaas.labels" $ | fromYaml -}}
+{{- range $key, $_ := $labels -}}
+{{- if hasPrefix "pod-security.kubernetes.io/" $key -}}
+{{- $_ := unset $labels $key -}}
+{{- end -}}
+{{- end -}}
+{{- $_ := set $labels "pod-security.kubernetes.io/enforce" "baseline" -}}
+{{- $_ := set $labels "pod-security.kubernetes.io/audit" "restricted" -}}
+{{- $_ := set $labels "pod-security.kubernetes.io/warn" "restricted" -}}
 apiVersion: v1
 kind: Namespace
 metadata:
   name: "spx-{{ .Values.projectID }}"
   labels:
-    {{- include "sfs-iaas.labels" $ | nindent 4 }}
+    {{- $labels | toYaml | nindent 4 }}
   annotations:
     {{- include "sfs-iaas.replicationStrategy" $ | nindent 4 }}

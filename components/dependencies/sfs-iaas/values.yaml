@@ -140,22 +140,8 @@ subnets: {}
   #    # @section -- Default Subnet's NAT gateway
   #    lanIP: "10.10.255.254"
   #
-  #    # -- BGP speaker settings if the NAT gateway is in BGP mode
-  #    # Scope: ADMIN
-  #    # @section -- Default Subnet's NAT gateway
-  #    bgpSpeaker:
-  #      enabled: true
-  #      asn: 65500
-  #      remoteAsn: 65000
-  #      neighbors:
-  #        - 100.65.0.0
-  #      # Optional parameters that can be omitted
-  #      # enableGracefulRestart: true
-  #      # routerId: 1.1.1.1
-  #      # holdTime: 1m
-  #      # password: "password123"
-  #      extraArgs:
-  #        - -v5
+  #    # BGP settings and tolerations of the NAT gateway are not configurable
+  #    # per subnet: they come from the AZ configuration (bgpSpeaker above).
 
 # -- SSH access to the VirtualMachines
 # @section -- SSH key store

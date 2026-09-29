@@ -35,6 +35,9 @@ Helm chart to deploy the Superphenix API
 | nodeSelector | object | `{}` |  |
 | podAnnotations | object | `{}` |  |
 | podSecurityContext | object | `{}` |  |
+| rbac.admissionPolicy.enabled | bool | `true` | Deny any Application, AppProject or namespace change by the API service account outside the per-project `spx-*` objects (requires Kubernetes 1.30+). |
+| rbac.appProjectNamespace | string | `""` | Namespace holding the per-project AppProjects. Must match `config.argoController.appProjectNamespace`. Empty means the release namespace. |
+| rbac.create | bool | `true` | Create the RBAC letting superphenix-api manage the Argo CD Applications and AppProjects backing KaaS/BaaS, and create per-project namespaces. Required unless the argoController features are unused. |
 | replicaCount | int | `1` |  |
 | resources | object | `{}` |  |
 | revisionHistoryLimit | int | `3` |  |

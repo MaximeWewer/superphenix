@@ -232,6 +232,11 @@ func createDisk(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = body.CreateDisk(r.Context(), namespace)
+	if errors.IsBadRequest(err) {
+		log.Warn().Err(err).Msg("Invalid disk")
+		httpError.Http(w, r, http.StatusBadRequest).Msg(err.Error())
+		return
+	}
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create disk")
 		httpError.Http(w, r, http.StatusInternalServerError).Msg("Failed to create disk")

@@ -195,6 +195,10 @@ func CreateKaaSAppValues(ctx context.Context, localId, location string, spec Kaa
 			log.Error().Err(err).Msg("Invalid post install chart")
 			return "", nil, err
 		}
+		if err := checkPostInstallRepoHost(ctx, spec.PostInstallChart.RepoUrl); err != nil {
+			log.Error().Err(err).Msg("Invalid post install chart")
+			return "", nil, err
+		}
 
 		pic.Revision = 1
 		pic.RepoUrl = spec.PostInstallChart.RepoUrl

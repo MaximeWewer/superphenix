@@ -89,6 +89,16 @@ type Config struct {
 	SpxPrefix string `yaml:"spxPrefix"`
 
 	ProductsConfig struct {
+		// ImportSources tunes the checks on user-provided disk import URLs
+		// (http and registry sources): they must point to public hosts.
+		ImportSources struct {
+			// AllowedHosts are trusted hosts (e.g. an internal mirror) that
+			// skip the public destination checks.
+			AllowedHosts []string `yaml:"allowedHosts"`
+			// DeniedCIDRs are refused on top of the non-public ranges, e.g.
+			// public addresses of the nodes or of the management network.
+			DeniedCIDRs []string `yaml:"deniedCIDRs"`
+		} `yaml:"importSources"`
 		NatGatewayDefault struct {
 			ExternalSubnets []string `yaml:"externalSubnets"`
 			DefaultRoutes   []struct {

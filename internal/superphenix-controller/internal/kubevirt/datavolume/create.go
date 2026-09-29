@@ -11,16 +11,34 @@ import (
 	"github.com/super-phenix/superphenix/internal/superphenix-controller/internal/utils"
 	"github.com/super-phenix/superphenix/internal/superphenix-controller/pkg/config"
 	logger "github.com/super-phenix/superphenix/pkg/utils/log"
+	"github.com/super-phenix/superphenix/pkg/utils/netguard"
 
 	spxId "github.com/super-phenix/superphenix/pkg/superphenix-id"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
 const storageFormat = "%sGi"
+
+// importResolver resolves import hosts; nil means the system resolver. Tests
+// replace it.
+var importResolver netguard.Resolver
+
+// checkImportURL refuses import URLs that do not point to a public host: the
+// CDI importer would otherwise fetch internal services on the user's behalf.
+func checkImportURL(ctx context.Context, url string, schemes ...string) error {
+	sources := config.Global.ProductsConfig.ImportSources
+	return netguard.CheckURL(ctx, url, netguard.Options{
+		Schemes:      schemes,
+		AllowedHosts: sources.AllowedHosts,
+		DeniedCIDRs:  sources.DeniedCIDRs,
+		Resolver:     importResolver,
+	})
+}
 
 func (info *CreateDiskInfo) CreateDisk(ctx context.Context, namespace string) error {
 	log := logger.GetLogger(ctx)
@@ -36,11 +54,19 @@ func (info *CreateDiskInfo) CreateDisk(ctx context.Context, namespace string) er
 	switch srcType := info.General.Source.Type; srcType {
 	case SourceTypeRegistry:
 		url := strings.TrimSpace(info.General.Source.URL)
+		if err := checkImportURL(ctx, url, "docker"); err != nil {
+			log.Warn().Err(err).Str("namespace", namespace).Msg("Disk import refused")
+			return apierrors.NewBadRequest(err.Error())
+		}
 		source.Registry = &v1beta1.DataVolumeSourceRegistry{
 			URL: &url,
 		}
 	case SourceTypeHttp:
 		url := strings.TrimSpace(info.General.Source.URL)
+		if err := checkImportURL(ctx, url, "http", "https"); err != nil {
+			log.Warn().Err(err).Str("namespace", namespace).Msg("Disk import refused")
+			return apierrors.NewBadRequest(err.Error())
+		}
 		source.HTTP = &v1beta1.DataVolumeSourceHTTP{
 			URL: url,
 		}

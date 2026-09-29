@@ -1,8 +1,11 @@
 package kaas
 
 import (
+	"context"
 	"fmt"
 	"regexp"
+
+	"github.com/super-phenix/superphenix/pkg/utils/netguard"
 )
 
 // The post-install chart fields end up in a shell script executed by a Job in
@@ -42,5 +45,22 @@ func validatePostInstallChart(spec PostInstallChartSpec) error {
 		return fmt.Errorf("post install chart namespace is invalid, it must match %s", postInstallNamespaceRegex.String())
 	}
 
+	return nil
+}
+
+// postInstallRepoResolver resolves repository hosts; nil means the system
+// resolver. Tests replace it.
+var postInstallRepoResolver netguard.Resolver
+
+// checkPostInstallRepoHost refuses repositories that are not on a public host:
+// the Job that installs the chart runs in the management cluster and would
+// otherwise fetch internal services on the user's behalf.
+func checkPostInstallRepoHost(ctx context.Context, repoURL string) error {
+	if err := netguard.CheckURL(ctx, repoURL, netguard.Options{
+		Schemes:  []string{"http", "https", "oci"},
+		Resolver: postInstallRepoResolver,
+	}); err != nil {
+		return fmt.Errorf("post install chart repository URL is not allowed: %w", err)
+	}
 	return nil
 }

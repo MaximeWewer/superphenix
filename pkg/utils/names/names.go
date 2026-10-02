@@ -7,7 +7,7 @@ var adjectives = []string{
 	"fancy", "fierce", "gentle", "glad", "grand", "happy", "humble", "jolly", "keen", "kind",
 	"lively", "lucky", "merry", "mighty", "neat", "nimble", "noble", "patient", "proud", "quick",
 	"quiet", "rapid", "sharp", "shiny", "silent", "smart", "smooth", "snappy", "steady", "sturdy",
-	"sunny", "swift", "tidy", "vivid", "warm", "wild", "wise", "witty", "young", "zesty",
+	"sunny", "swift", "tidy", "vivid", "warm", "wild", "wise", "witty", "young", "zesty", "super",
 }
 
 var colors = []string{
@@ -24,6 +24,7 @@ var animals = []string{
 	"leopard", "lion", "lynx", "marmot", "mole", "moose", "newt", "otter", "owl", "panda",
 	"panther", "parrot", "pelican", "penguin", "puffin", "puma", "rabbit", "raven", "robin", "salmon",
 	"seal", "shark", "sparrow", "swan", "tiger", "toucan", "turtle", "walrus", "wolf", "zebra",
+	"phenix", "finix",
 }
 
 // Generate returns a random name made of an adjective, a color and an animal

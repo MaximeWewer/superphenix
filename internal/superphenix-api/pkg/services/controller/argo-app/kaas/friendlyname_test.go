@@ -84,6 +84,52 @@ func TestCreateKaaSAppValues_ClusterFriendlyName(t *testing.T) {
 			}),
 			expectedStrings: []string{"clusterFriendlyName: renamed", "revision: 4"},
 		},
+		{
+			name:            "update with nothing changed keeps the revision",
+			spec:            newSpec(EssentialsSpec{ClusterFriendlyName: "my-cluster", Revision: 3}),
+			oldSpec:         oldSpec(EssentialsSpec{ClusterFriendlyName: "my-cluster", Revision: 3}),
+			expectedStrings: []string{"revision: 3"},
+		},
+		{
+			name: "update of node groups keeps the revision",
+			spec: func() KaaSSpec {
+				spec := newSpec(EssentialsSpec{ClusterFriendlyName: "my-cluster"})
+				spec.Groups[0].Replicas = 5
+				return spec
+			}(),
+			oldSpec:         oldSpec(EssentialsSpec{ClusterFriendlyName: "my-cluster", Revision: 3}),
+			expectedStrings: []string{"revision: 3"},
+		},
+		{
+			name:            "update with changed essentials values",
+			spec:            newSpec(EssentialsSpec{CorednsValues: "replicaCount: 3"}),
+			oldSpec:         oldSpec(EssentialsSpec{CorednsValues: "replicaCount: 2", Revision: 3}),
+			expectedStrings: []string{"revision: 4"},
+		},
+		{
+			name:            "update with essentials values reset",
+			spec:            newSpec(EssentialsSpec{}),
+			oldSpec:         oldSpec(EssentialsSpec{CorednsValues: "replicaCount: 2", Revision: 3}),
+			expectedStrings: []string{"revision: 4"},
+		},
+		{
+			name:            "reinstall increments the revision",
+			spec:            newSpec(EssentialsSpec{ClusterFriendlyName: "my-cluster", Revision: 4}),
+			oldSpec:         oldSpec(EssentialsSpec{ClusterFriendlyName: "my-cluster", Revision: 3}),
+			expectedStrings: []string{"revision: 4"},
+		},
+		{
+			name:            "update of a cluster without revision",
+			spec:            newSpec(EssentialsSpec{}),
+			oldSpec:         oldSpec(EssentialsSpec{}),
+			expectedStrings: []string{"revision: 1"},
+		},
+		{
+			name:            "reinstall of a cluster without revision",
+			spec:            newSpec(EssentialsSpec{Revision: 1}),
+			oldSpec:         oldSpec(EssentialsSpec{}),
+			expectedStrings: []string{"revision: 2"},
+		},
 	}
 
 	for _, tt := range tests {

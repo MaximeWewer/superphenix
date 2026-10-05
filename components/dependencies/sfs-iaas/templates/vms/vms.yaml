@@ -120,6 +120,13 @@ spec:
         {{- end }}
 
         devices:
+          {{- with $compute.gpu }}
+          gpus:
+          {{- range . }}
+          - deviceName: {{ get $.Values.deviceMapping .device }}
+            name: {{ .name | quote }}
+          {{- end }}
+          {{- end }}
           {{- if $vm.tpm }}
           tpm:
             enabled: {{ $vm.tpm.enabled | default false }}

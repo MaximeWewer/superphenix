@@ -122,9 +122,14 @@ spec:
         devices:
           {{- with $compute.gpu }}
           gpus:
+          {{- $index := 0 }}
           {{- range . }}
-          - deviceName: {{ get $.Values.deviceMapping .device }}
-            name: {{ .name | quote }}
+          {{- $gpu := . }}
+          {{- range $i := until (int $gpu.count) }}
+          - deviceName: {{ get $.Values.deviceMapping $gpu.device | quote}}
+            name: gpu-{{ add $index 1 }}
+          {{- $index = add $index 1 }}
+          {{- end }}
           {{- end }}
           {{- end }}
           {{- if $vm.tpm }}

@@ -376,7 +376,6 @@ vms:
 #        guest: 2Gi
 #      gpu:
 #      - device: ""
-#        count: 1
 #    # -- Mouse & keyboard control
 #    controls:
 #      # -- Enabled by default if omitted

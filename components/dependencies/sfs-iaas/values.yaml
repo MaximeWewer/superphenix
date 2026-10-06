@@ -32,6 +32,12 @@ gitops: false
 # @section -- Organization parameters
 storageClassMapping: {}
 
+# -- Mapping between user-friendly names of devices and their real names.
+# The mapping is specified for the current AZ, meaning that each AZ can have a different mapping.
+# This parameter cannot be overriden by the user.
+# @section -- Organization parameters
+deviceMapping: {}
+
 # -- BGP speaker configuration for this AZ.
 # The value is passed as an escape JSON and must be decoded in the template
 # This parameter cannot be overriden by the user.
@@ -368,6 +374,8 @@ vms:
 #        threads: 1
 #      memory:
 #        guest: 2Gi
+#      gpu:
+#      - device: ""
 #    # -- Mouse & keyboard control
 #    controls:
 #      # -- Enabled by default if omitted

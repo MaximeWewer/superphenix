@@ -122,8 +122,8 @@ spec:
         devices:
           {{- with $compute.gpu }}
           gpus:
-          {{- range $i, $if := . }}
-          - deviceName: {{ get $.Values.deviceMapping .device | quote}}
+          {{- range $i, $gpu := . }}
+          - deviceName: {{ get $.Values.deviceMapping $gpu.device | quote}}
             name: gpu-{{ $i }}
           {{- end }}
           {{- end }}

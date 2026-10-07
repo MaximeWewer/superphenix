@@ -30,10 +30,6 @@ type CreateLoadBalancerInfo struct {
 	} `json:"ports"`
 }
 
-const (
-	allowedCIDR = utils.LoadBalancerVIPCIDR
-)
-
 func (info *CreateLoadBalancerInfo) CreateLoadBalancer(ctx context.Context) error {
 	log := logger.GetLogger(ctx)
 	// Check VIP
@@ -43,7 +39,7 @@ func (info *CreateLoadBalancerInfo) CreateLoadBalancer(ctx context.Context) erro
 		log.Err(err).Any("info", info).Msg("Error parsing creation values - VIP invalid")
 		return err
 	}
-	_, cidr, err := net.ParseCIDR(allowedCIDR)
+	_, cidr, err := net.ParseCIDR(utils.LoadBalancerVIPCIDR)
 	if err != nil {
 		log.Err(err).Any("info", info).Msg("Error parsing allowed CIDR")
 		return err

@@ -53,7 +53,7 @@ func (info *UpdateLoadBalancerInfo) UpdateLoadBalancer(ctx context.Context, name
 		log.Err(err).Any("info", info).Msg("Error parsing creation values - VIP invalid")
 		return err
 	}
-	_, cidr, err := net.ParseCIDR(allowedCIDR)
+	_, cidr, err := net.ParseCIDR(utils.LoadBalancerVIPCIDR)
 	if err != nil {
 		log.Err(err).Any("info", info).Msg("Error parsing allowed CIDR")
 		return err

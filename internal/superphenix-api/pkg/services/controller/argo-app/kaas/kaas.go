@@ -45,6 +45,24 @@ func azDomainValues(cfg map[string]any) map[string]any {
 	return cfg
 }
 
+// essentialsRevision keeps the old revision and increments it when the essentials job must rerun:
+// changed essentials values, renamed cluster, or a requested revision above the old one.
+func essentialsRevision(spec EssentialsSpec, oldSpec *KaaSSpec) int {
+	if oldSpec == nil {
+		return 1
+	}
+	old := oldSpec.KaasEssentials
+	revision := max(old.Revision, 1)
+	if spec.CorednsValues != old.CorednsValues ||
+		spec.CiliumValues != old.CiliumValues ||
+		spec.MetricsServerValues != old.MetricsServerValues ||
+		spec.ClusterFriendlyName != old.ClusterFriendlyName ||
+		spec.Revision > old.Revision {
+		revision++
+	}
+	return revision
+}
+
 // CreateKaaSAppValues generates the Helm values YAML for a KaaS application.
 func CreateKaaSAppValues(ctx context.Context, localId, location string, spec KaaSSpec, kaasConfig KaaSConfig, oldSpec *KaaSSpec) (string, []string, error) {
 	log := logger.GetLogger(ctx)
@@ -146,19 +164,11 @@ func CreateKaaSAppValues(ctx context.Context, localId, location string, spec Kaa
 		}
 	}
 
-	revision := 1
 	essentialsValues := EssentialsValues{}
 
 	if spec.KaasEssentials.CorednsValues != "" ||
 		spec.KaasEssentials.CiliumValues != "" ||
 		spec.KaasEssentials.MetricsServerValues != "" {
-
-		if oldSpec != nil &&
-			(spec.KaasEssentials.CorednsValues != oldSpec.KaasEssentials.CorednsValues ||
-				spec.KaasEssentials.CiliumValues != oldSpec.KaasEssentials.CiliumValues ||
-				spec.KaasEssentials.MetricsServerValues != oldSpec.KaasEssentials.MetricsServerValues) {
-			revision = oldSpec.KaasEssentials.Revision + 1
-		}
 
 		var corednsInterface interface{}
 		if spec.KaasEssentials.CorednsValues != "" {
@@ -188,19 +198,14 @@ func CreateKaaSAppValues(ctx context.Context, localId, location string, spec Kaa
 			Cilium:        ciliumInterface,
 			MetricsServer: metricsServerInterface,
 		}
-
-	} else if oldSpec != nil && (oldSpec.KaasEssentials.CorednsValues != "" ||
-		oldSpec.KaasEssentials.CiliumValues != "" ||
-		oldSpec.KaasEssentials.MetricsServerValues != "") {
-		// If essentialsValues has been reset, update the revision version
-		revision = oldSpec.KaasEssentials.Revision + 1
 	}
 
 	kaasEsssentials := Essentials{
-		Revision:        revision,
-		StorageClasses:  storageClasses,
-		SnapshotClasses: storageClasses, // StorageClass always match with SnapshotClass
-		Values:          essentialsValues,
+		ClusterFriendlyName: spec.KaasEssentials.ClusterFriendlyName,
+		Revision:            essentialsRevision(spec.KaasEssentials, oldSpec),
+		StorageClasses:      storageClasses,
+		SnapshotClasses:     storageClasses, // StorageClass always match with SnapshotClass
+		Values:              essentialsValues,
 	}
 
 	// Post Install Chart Validation

@@ -31,7 +31,7 @@ type CreateLoadBalancerInfo struct {
 }
 
 const (
-	allowedCIDR = "198.18.0.0/16"
+	allowedCIDR = utils.LoadBalancerVIPCIDR
 )
 
 func (info *CreateLoadBalancerInfo) CreateLoadBalancer(ctx context.Context) error {

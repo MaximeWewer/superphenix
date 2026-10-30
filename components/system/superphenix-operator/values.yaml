@@ -25,16 +25,21 @@ leaderElection:
   # -- Enable leader election for the operator, necessary if running multiple replicas.
   enabled: true
 
-# -- Metrics and Health configuration.
+# -- Metrics configuration.
 metrics:
   # -- The address the metric endpoint binds to. Use "0" to disable.
   bindAddress: "0" # Disable by default
   # -- Whether to secure the metrics endpoint with TLS.
   secure: true
 
+# -- Health check configuration.
 health:
   # -- The address the health probe endpoint binds to.
   probeBindAddress: ":8081"
+
+# -- Network policy configuration.
+networkPolicy:
+  enabled: true
 
 image:
   # -- Repository for the operator image.
@@ -179,7 +184,7 @@ config:
 
 # -- Superphenix toolbox configuration.
 # The toolbox is an optional standalone Deployment deployed alongside the operator.
-# It provides standard tooling (bash, jq, kubectl, helm, k9s) and mounts the
+# It provides standard tooling (bash, jq, kubectl, helm, k9s and more) and mounts the
 # kubeconfig of every cluster managed by the operator, allowing administrators
 # to access all clusters from a single container.
 toolbox:
@@ -238,11 +243,11 @@ management:
 
   # -- Override the default Superphenix system chart location.
   # This is useful if you want to use a custom chart.
-  systemLocation:
+  systemLocation: {}
     # -- Override the default Superphenix system chart repository.
-    repoURL: ""
+    # repoURL: ""
     # -- Override the default Superphenix system chart name.
-    chartName: ""
+    # chartName: ""
   # -- Override the default Superphenix system chart version.
   # This is useful if you want to use a custom chart.
   version: ""

@@ -3545,6 +3545,63 @@ const docTemplate = `{
                 }
             }
         },
+        "/{orgaId}/api/spx-ctrl/{az}/{projectId}/gpu-class": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": [
+                            "OrganizationRead"
+                        ]
+                    }
+                ],
+                "description": "Retrieve the passthrough GPU classes ({id, displayName}) available in a specific AZ",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1",
+                    "Superphenix Controller"
+                ],
+                "summary": "Retrieve GPU classes",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Organization ID",
+                        "name": "orgaId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "AZ Code",
+                        "name": "az",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project ID",
+                        "name": "projectId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "GPU classes",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "object"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
         "/{orgaId}/api/spx-ctrl/{az}/{projectId}/instance": {
             "get": {
                 "security": [
@@ -4005,7 +4062,7 @@ const docTemplate = `{
             }
         },
         "/{orgaId}/api/spx-ctrl/{az}/{projectId}/instance-snapshot/{effectiveId}/restore": {
-            "get": {
+            "post": {
                 "security": [
                     {
                         "Bearer": [
@@ -4015,7 +4072,7 @@ const docTemplate = `{
                         ]
                     }
                 ],
-                "description": "Restore a VM snapshot by creating a new instance from it",
+                "description": "Restore a VM snapshot in place onto its source instance, which must exist",
                 "produces": [
                     "application/json"
                 ],
@@ -4052,20 +4109,6 @@ const docTemplate = `{
                         "name": "effectiveId",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "New instance name",
-                        "name": "name",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "New instance local ID (UUID)",
-                        "name": "localId",
-                        "in": "query",
-                        "required": true
                     }
                 ],
                 "responses": {
@@ -4077,6 +4120,9 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found"
+                    },
+                    "409": {
+                        "description": "Conflict"
                     },
                     "500": {
                         "description": "Internal Server Error"
@@ -9360,8 +9406,15 @@ const docTemplate = `{
                         "cpu": {
                             "type": "integer"
                         },
+                        "gpu": {
+                            "description": "Gpu lists the passthrough GPUs by class (at most 1). Nil or empty means no GPU.",
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/instance.InstanceGpuBody"
+                            }
+                        },
                         "memory": {
-                            "type": "integer"
+                            "type": "string"
                         }
                     }
                 },
@@ -9492,6 +9545,7 @@ const docTemplate = `{
                 "gitops": {
                     "type": "string"
                 },
+                "gpus": {},
                 "id": {
                     "description": "local ID",
                     "type": "string"
@@ -9505,6 +9559,14 @@ const docTemplate = `{
                 },
                 "vm": {},
                 "vmi": {}
+            }
+        },
+        "instance.InstanceGpuBody": {
+            "type": "object",
+            "properties": {
+                "device": {
+                    "type": "string"
+                }
             }
         },
         "instance.InstanceNetworkBody": {
@@ -9567,8 +9629,15 @@ const docTemplate = `{
                         "cpu": {
                             "type": "integer"
                         },
+                        "gpu": {
+                            "description": "Gpu is the desired GPU set by class. Nil preserves the current GPUs;\na non-nil slice sets them (empty removes all).",
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/instance.InstanceGpuBody"
+                            }
+                        },
                         "memory": {
-                            "type": "integer"
+                            "type": "string"
                         }
                     }
                 },
@@ -9717,7 +9786,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "memory": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "name": {
                     "type": "string",
@@ -9895,6 +9964,9 @@ const docTemplate = `{
                 },
                 "spec": {
                     "type": "object",
+                    "required": [
+                        "subnetEId"
+                    ],
                     "properties": {
                         "endpoints": {
                             "description": "ipv4 list",
@@ -9915,6 +9987,10 @@ const docTemplate = `{
                             "items": {
                                 "type": "string"
                             }
+                        },
+                        "subnetEId": {
+                            "description": "Subnet the load balancer attaches to, endpoints must be in it",
+                            "type": "string"
                         },
                         "vip": {
                             "type": "string"
@@ -9978,6 +10054,9 @@ const docTemplate = `{
                 },
                 "spec": {
                     "type": "object",
+                    "required": [
+                        "subnetEId"
+                    ],
                     "properties": {
                         "endpoints": {
                             "description": "ipv4 list",
@@ -9998,6 +10077,10 @@ const docTemplate = `{
                             "items": {
                                 "type": "string"
                             }
+                        },
+                        "subnetEId": {
+                            "description": "Subnet the load balancer attaches to, endpoints must be in it",
+                            "type": "string"
                         },
                         "vip": {
                             "type": "string"

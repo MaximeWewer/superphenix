@@ -342,7 +342,7 @@ apps:
       cleanupOnDeletion: false
       syncOptions: {}
     repoURL: https://helm.cilium.io/
-    targetRevision: "1.17.2"
+    targetRevision: "1.19.1"
     namespace: kube-system
     helm:
       chart: cilium
@@ -477,8 +477,7 @@ apps:
               # Enable the HTTP-01 challenge provider
               solvers:
               - http01:
-                  ingress:
-                    class: traefik
+                  ingress: {}
         - |
           apiVersion: cert-manager.io/v1
           kind: ClusterIssuer
@@ -752,7 +751,7 @@ apps:
           virtualMachineInstancesPerNode: 100
 
           # Storageclass used to store TPM/EFI and more (VM backend storage)
-          vmStateStorageClass: default.spx-rbd-3x
+          vmStateStorageClass: spx-storage.spx-rbd-3x
 
           # Defines how VMs are evicted from a node when it is drained.
           # We run live migrations of the VMs to prevent interruptions.
@@ -1674,7 +1673,7 @@ apps:
     enabled: true
     modes: [Management]
     repoURL: "oci://ghcr.io/super-phenix/charts/superphenix-console"
-    targetRevision: "0.6.1"
+    targetRevision: "0.7.0"
     automation:
       enabled: true
       prune: true

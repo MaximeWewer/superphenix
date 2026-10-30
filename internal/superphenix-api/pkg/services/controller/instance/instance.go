@@ -21,6 +21,7 @@ import (
 	"github.com/super-phenix/superphenix/pkg/utils/decoder"
 	httpError "github.com/super-phenix/superphenix/pkg/utils/error"
 	logger "github.com/super-phenix/superphenix/pkg/utils/log"
+	"github.com/super-phenix/superphenix/pkg/utils/validation"
 
 	spxId "github.com/super-phenix/superphenix/pkg/superphenix-id"
 
@@ -203,6 +204,7 @@ func (h *Service) GetInstance(w http.ResponseWriter, r *http.Request) {
 		result.VMI = azResult["vmi"]
 		result.CloudInit = azResult["cloudInit"]
 		result.ContainerDisks = resolveMountedContainerDisks(azResult)
+		result.Gpus = azResult["gpus"]
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -253,6 +255,14 @@ func (h *Service) CreateInstance(w http.ResponseWriter, r *http.Request) {
 		httpError.Http(w, r, http.StatusBadRequest).Any("reason", "Network is required").Msg(http.StatusText(http.StatusBadRequest))
 		return
 	}
+
+	memory, err := validation.ValidateComputeSize(body.Compute.Cpu, body.Compute.Memory)
+	if err != nil {
+		log.Err(err).Msg("Invalid compute size")
+		httpError.Http(w, r, http.StatusBadRequest).Str("reason", err.Error()).Msg(http.StatusText(http.StatusBadRequest))
+		return
+	}
+	body.Compute.Memory = memory.String()
 
 	instance, m, err := controller.CreateIntoDb(r.Context(), body.General.ProductName, model.ProductTypeInstance.Name, azDb.Code, org.ID, projectEntity.ID)
 	if err != nil {
@@ -367,6 +377,14 @@ func (h *Service) UpdateInstance(w http.ResponseWriter, r *http.Request) {
 		httpError.Http(w, r, http.StatusBadRequest).Any("body", body).Msg("Network is required")
 		return
 	}
+
+	memory, err := validation.ValidateComputeSize(body.Compute.Cpu, body.Compute.Memory)
+	if err != nil {
+		log.Err(err).Msg("Invalid compute size")
+		httpError.Http(w, r, http.StatusBadRequest).Str("reason", err.Error()).Msg(http.StatusText(http.StatusBadRequest))
+		return
+	}
+	body.Compute.Memory = memory.String()
 	productEid := chi.URLParam(r, "effectiveId")
 	if _, err := controller.UpdateIntoDb(r.Context(), productEid, body.General.ProductName, model.ProductTypeInstance.Name, azDb.Code, projectEntity.ID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -707,8 +725,10 @@ type CreateInstanceBody struct {
 		Labels      []string `json:"labels"`
 	} `json:"general"`
 	Compute struct {
-		Cpu    int `json:"cpu"`
-		Memory int `json:"memory"`
+		Cpu    int    `json:"cpu"`
+		Memory string `json:"memory"`
+		// Gpu lists the passthrough GPUs by class (at most 1). Nil or empty means no GPU.
+		Gpu []InstanceGpuBody `json:"gpu,omitempty"`
 	} `json:"compute"`
 	Network   []InstanceNetworkBody `json:"network" validate:"required,dive"`
 	Disks     []InstanceDiskBody    `json:"disks"`
@@ -729,8 +749,10 @@ type CreateInstanceSpxControllerBody struct {
 		Labels      []string `json:"labels"`
 	} `json:"general"`
 	Compute struct {
-		Cpu    int `json:"cpu"`
-		Memory int `json:"memory"`
+		Cpu    int    `json:"cpu"`
+		Memory string `json:"memory"`
+		// Gpu lists the passthrough GPUs by class (at most 1). Nil or empty means no GPU.
+		Gpu []InstanceGpuBody `json:"gpu,omitempty"`
 	} `json:"compute"`
 	Network        []InstanceNetworkBody           `json:"network"`
 	Disks          []InstanceDiskSpxControllerBody `json:"disks"`
@@ -748,8 +770,11 @@ type UpdateInstanceBody struct {
 		Labels      []string `json:"labels"`
 	} `json:"general"`
 	Compute struct {
-		Cpu    int `json:"cpu"`
-		Memory int `json:"memory"`
+		Cpu    int    `json:"cpu"`
+		Memory string `json:"memory"`
+		// Gpu is the desired GPU set by class. Nil preserves the current GPUs;
+		// a non-nil slice sets them (empty removes all).
+		Gpu *[]InstanceGpuBody `json:"gpu,omitempty"`
 	} `json:"compute"`
 	Network   []InstanceNetworkBody `json:"network" validate:"required,dive"`
 	Disks     []InstanceDiskBody    `json:"disks"`
@@ -769,8 +794,11 @@ type UpdateInstanceSpxControllerBody struct {
 		Labels      []string `json:"labels"`
 	} `json:"general"`
 	Compute struct {
-		Cpu    int `json:"cpu"`
-		Memory int `json:"memory"`
+		Cpu    int    `json:"cpu"`
+		Memory string `json:"memory"`
+		// Gpu is the desired GPU set by class. Nil preserves the current GPUs;
+		// a non-nil slice sets them (empty removes all).
+		Gpu *[]InstanceGpuBody `json:"gpu,omitempty"`
 	} `json:"compute"`
 	Network        []InstanceNetworkBody           `json:"network"`
 	Disks          []InstanceDiskSpxControllerBody `json:"disks"`
@@ -838,6 +866,12 @@ type InstanceDiskBody struct {
 	Disk  CreateDiskBody `json:"disk,omitempty"`
 }
 
+// InstanceGpuBody is one requested passthrough GPU, identified by its class
+// (see GET /gpu-class on the AZ controller).
+type InstanceGpuBody struct {
+	Device string `json:"device"`
+}
+
 type InstanceCloudInitBody struct {
 	Custom bool   `json:"custom"`
 	Bus    string `json:"bus"`
@@ -858,6 +892,7 @@ type InstanceFullResponse struct {
 	VMI             interface{} `json:"vmi"`
 	CloudInit       interface{} `json:"cloudInit"`
 	ContainerDisks  []string    `json:"containerDisks"`
+	Gpus            interface{} `json:"gpus,omitempty"`
 }
 
 // AdvancedOptions

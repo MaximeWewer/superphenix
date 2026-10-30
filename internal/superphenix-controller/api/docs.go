@@ -1238,6 +1238,54 @@ const docTemplate = `{
                 }
             }
         },
+        "/{orgId}/{projectId}/gpu-class": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Returns this AZ's passthrough GPU classes declared in the controller config, sorted by ID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1",
+                    "Config"
+                ],
+                "summary": "Get the GPU classes",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Organization ID",
+                        "name": "orgId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project ID",
+                        "name": "projectId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "GPU classes",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/config.GpuClassEntry"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
         "/{orgId}/{projectId}/instance": {
             "get": {
                 "description": "Retrieve all instances for a project",
@@ -1644,8 +1692,8 @@ const docTemplate = `{
             }
         },
         "/{orgId}/{projectId}/instance-snapshot/{effectiveId}/restore": {
-            "get": {
-                "description": "Restore a VM Snapshot",
+            "post": {
+                "description": "Restore a VM Snapshot in place onto its source instance, which must exist",
                 "consumes": [
                     "application/json"
                 ],
@@ -1671,6 +1719,13 @@ const docTemplate = `{
                         "name": "projectId",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Snapshot EID",
+                        "name": "effectiveId",
+                        "in": "path",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1679,6 +1734,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request"
+                    },
+                    "404": {
+                        "description": "Not Found"
+                    },
+                    "409": {
+                        "description": "Conflict"
                     },
                     "500": {
                         "description": "Internal Server Error"
@@ -2850,57 +2911,6 @@ const docTemplate = `{
                         "description": "Internal Server Error"
                     }
                 }
-            },
-            "delete": {
-                "description": "Delete a LoadBalancer by Effective ID",
-                "produces": [
-                    "text/plain"
-                ],
-                "tags": [
-                    "v1",
-                    "LoadBalancer"
-                ],
-                "summary": "Delete a LoadBalancer",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Organization ID",
-                        "name": "orgId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Project ID",
-                        "name": "projectId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "LoadBalancer Effective ID",
-                        "name": "effectiveId",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "deleted",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request"
-                    },
-                    "404": {
-                        "description": "Not Found"
-                    },
-                    "500": {
-                        "description": "Internal Server Error"
-                    }
-                }
             }
         },
         "/{orgId}/{projectId}/load-balancer/localId/{localId}": {
@@ -3037,12 +3047,19 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "LoadBalancer Effective ID",
+                        "name": "effectiveId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
                         "description": "LoadBalancer info",
                         "name": "Body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/loadBalancer.CreateLoadBalancerInfo"
+                            "$ref": "#/definitions/loadBalancer.UpdateLoadBalancerInfo"
                         }
                     }
                 ],
@@ -3052,6 +3069,60 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request"
+                    },
+                    "404": {
+                        "description": "Not Found"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            },
+            "delete": {
+                "description": "Delete a LoadBalancer by Effective ID",
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "v1",
+                    "LoadBalancer"
+                ],
+                "summary": "Delete a LoadBalancer",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Organization ID",
+                        "name": "orgId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project ID",
+                        "name": "projectId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "LoadBalancer Effective ID",
+                        "name": "effectiveId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "deleted",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "404": {
+                        "description": "Not Found"
                     },
                     "500": {
                         "description": "Internal Server Error"
@@ -4822,6 +4893,17 @@ const docTemplate = `{
                 }
             }
         },
+        "config.GpuClassEntry": {
+            "type": "object",
+            "properties": {
+                "displayName": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                }
+            }
+        },
         "config.KaaSConfig": {
             "type": "object",
             "properties": {
@@ -5858,19 +5940,7 @@ const docTemplate = `{
                 "ports": {
                     "type": "array",
                     "items": {
-                        "type": "object",
-                        "properties": {
-                            "port": {
-                                "description": "Name generated from other fields",
-                                "type": "integer"
-                            },
-                            "protocol": {
-                                "type": "string"
-                            },
-                            "targetPort": {
-                                "type": "integer"
-                            }
-                        }
+                        "$ref": "#/definitions/loadBalancer.Port"
                     }
                 },
                 "projectID": {
@@ -5888,6 +5958,57 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                },
+                "subnetEId": {
+                    "description": "Subnet the load balancer attaches to, endpoints must be in it",
+                    "type": "string"
+                },
+                "vip": {
+                    "type": "string"
+                }
+            }
+        },
+        "loadBalancer.Port": {
+            "type": "object",
+            "properties": {
+                "port": {
+                    "description": "Name generated from other fields",
+                    "type": "integer"
+                },
+                "protocol": {
+                    "type": "string"
+                },
+                "targetPort": {
+                    "type": "integer"
+                }
+            }
+        },
+        "loadBalancer.UpdateLoadBalancerInfo": {
+            "type": "object",
+            "properties": {
+                "endpoints": {
+                    "description": "ip list",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "ports": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/loadBalancer.Port"
+                    }
+                },
+                "selectors": {
+                    "description": "Selectors and Endpoints are mutually exclusives",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "subnetEId": {
+                    "description": "Subnet the load balancer attaches to, endpoints must be in it",
+                    "type": "string"
                 },
                 "vip": {
                     "type": "string"
@@ -13516,6 +13637,12 @@ const docTemplate = `{
                 "gitops": {
                     "type": "string"
                 },
+                "gpus": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/config.GpuClassEntry"
+                    }
+                },
                 "id": {
                     "description": "local ID",
                     "type": "string"
@@ -13673,6 +13800,10 @@ const docTemplate = `{
                 },
                 "status": {
                     "$ref": "#/definitions/view.LBStatus"
+                },
+                "subnetEId": {
+                    "description": "Subnet the load balancer is pinned to, empty for unpinned rules",
+                    "type": "string"
                 }
             }
         },
@@ -15203,8 +15334,15 @@ const docTemplate = `{
                         "cpu": {
                             "type": "integer"
                         },
+                        "gpu": {
+                            "description": "Gpu lists the passthrough GPUs by class. Nil or empty means no GPU.",
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/vm.GPU"
+                            }
+                        },
                         "memory": {
-                            "type": "integer"
+                            "type": "string"
                         }
                     }
                 },
@@ -15299,6 +15437,14 @@ const docTemplate = `{
                 }
             }
         },
+        "vm.GPU": {
+            "type": "object",
+            "properties": {
+                "device": {
+                    "type": "string"
+                }
+            }
+        },
         "vm.Network": {
             "type": "object",
             "properties": {
@@ -15357,8 +15503,15 @@ const docTemplate = `{
                         "cpu": {
                             "type": "integer"
                         },
+                        "gpu": {
+                            "description": "Gpu is the desired passthrough GPU set by class. Nil preserves the\ncurrent GPUs; non-nil sets them explicitly (empty removes all).",
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/vm.GPU"
+                            }
+                        },
                         "memory": {
-                            "type": "integer"
+                            "type": "string"
                         }
                     }
                 },

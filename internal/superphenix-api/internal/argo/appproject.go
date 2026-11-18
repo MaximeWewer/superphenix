@@ -15,8 +15,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ensureAppProject creates the project's AppProject, or reconciles the spec of an
-// existing one so a prefix/destination change is picked up.
 // DefaultClusterResourceWhitelist lists the cluster-scoped kinds the
 // Applications of a project may manage: the Kube-OVN network objects and the
 // namespace rendered by sfs-iaas, and the Kamaji DataStore of sfs-kaas.
@@ -48,6 +46,8 @@ func (c *Client) clusterResourceWhitelist() []metav1.GroupKind {
 	return DefaultClusterResourceWhitelist
 }
 
+// ensureAppProject creates the project's AppProject, or reconciles the spec of an
+// existing one so a prefix/destination change is picked up.
 func (c *Client) ensureAppProject(ctx context.Context, orgaId, projectId string) error {
 	log := logger.GetLogger(ctx)
 	namespace := c.Namespace(projectId)

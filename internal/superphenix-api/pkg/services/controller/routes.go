@@ -3,6 +3,7 @@ package controller
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/super-phenix/superphenix/internal/superphenix-api/internal/authorization/permify"
 	"github.com/super-phenix/superphenix/internal/superphenix-api/internal/db/crud/product"
@@ -40,13 +41,15 @@ func NewControllerModule(name string, routes []router.Route, groups ...router.Gr
 }
 
 // SharedMiddlewares is the chain applied to every controller route: auth, user-id
-// propagation and the baseline organization-read check.
+// propagation, the baseline organization-read check, the check that the project belongs
+// to the organization and the refusal of deactivated projects.
 func SharedMiddlewares() []router.Middleware {
 	return []router.Middleware{
 		authentication.Authenticate(jwt.JwtBearerAuth, apiToken.ApiTokenAuth),
 		proxy.AddUserIdToRequestHeader,
 		Perm(pwPermission.OrganizationRead),
 		CheckProjectInOrganization,
+		CheckProjectActive,
 	}
 }
 
@@ -88,6 +91,37 @@ func CheckProjectInOrganization(next http.Handler) http.Handler {
 }
 
 func Perm(permission string) router.Middleware { return permify.CheckPermission(permission) }
+
+// CheckProjectActive rejects with 423 Locked any request on a deactivated project (see
+// model.ProjectDeactivation). Routes without a {projectId} are not concerned.
+func CheckProjectActive(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		orgaUuid, errOrga := uuid.Parse(chi.URLParam(r, "orgaId"))
+		projectUuid, errProject := uuid.Parse(chi.URLParam(r, "projectId"))
+		if errOrga != nil || errProject != nil {
+			// No (valid) project: left to the handler.
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		deactivations, err := project.ListDeactivations(r.Context(), orgaUuid, projectUuid)
+		if err != nil {
+			log.Error().Err(err).Str("projectId", projectUuid.String()).Msg("Failed to check project deactivation")
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		if len(deactivations) > 0 {
+			reasons := make([]string, len(deactivations))
+			for i, d := range deactivations {
+				reasons[i] = d.Reason
+			}
+			http.Error(w, "project deactivated: "+strings.Join(reasons, ", "), http.StatusLocked)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
 
 // CheckCreationQuota rejects the request if the project's product creation quota is reached.
 func CheckCreationQuota(next http.Handler) http.Handler {

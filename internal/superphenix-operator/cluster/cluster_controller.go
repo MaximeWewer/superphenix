@@ -44,7 +44,6 @@ var (
 // +kubebuilder:rbac:groups=argoproj.io,resources=applications;appprojects,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=secrets;configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch;create;update;patch
-// +kubebuilder:rbac:groups="*",resources="*",verbs="*"
 
 // Reconciler reconciles a Cluster object.
 type Reconciler struct {
@@ -67,6 +66,9 @@ type Reconciler struct {
 
 	// DisableVersionValidation disables validation of versions entirely.
 	DisableVersionValidation bool
+
+	// ToolboxEnabled controls whether the toolbox kubeconfig secrets are reconciled.
+	ToolboxEnabled bool
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -95,18 +97,17 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *Reconciler) findClustersForSecret(ctx context.Context, secret client.Object) []reconcile.Request {
 	clusterList := &operatorv1alpha1.ClusterList{}
-	err := r.List(ctx, clusterList)
+	listOpts := []client.ListOption{}
+	if r.OperatorNamespace != "" {
+		listOpts = append(listOpts, client.InNamespace(r.OperatorNamespace))
+	}
+	err := r.List(ctx, clusterList, listOpts...)
 	if err != nil {
 		return nil
 	}
 
 	var requests []reconcile.Request
 	for _, cluster := range clusterList.Items {
-		// Only consider clusters that are in the namespace of the controller
-		if r.OperatorNamespace != "" && cluster.Namespace != r.OperatorNamespace {
-			continue
-		}
-
 		if cluster.Spec.Connection != nil && cluster.Spec.Connection.SecretRef != nil {
 			secretName := cluster.Spec.Connection.SecretRef.Name
 			secretNamespace := cluster.Spec.Connection.SecretRef.Namespace
@@ -204,6 +205,16 @@ func (r *Reconciler) reconcileCluster(ctx context.Context, cluster *operatorv1al
 		reconcileErr = err
 	}
 
+	// Reconcile toolbox kubeconfig secret (always, regardless of ArgoCD secret errors)
+	if r.ToolboxEnabled {
+		if err := r.reconcileToolboxKubeconfigSecret(ctx); err != nil {
+			log.Error(err, "Failed to reconcile toolbox kubeconfig secret")
+			if reconcileErr == nil {
+				reconcileErr = err
+			}
+		}
+	}
+
 	if reconcileErr == nil {
 		// Verify the cluster can be reached and administered
 		var result ctrl.Result
@@ -291,8 +302,16 @@ func (r *Reconciler) reconcileCluster(ctx context.Context, cluster *operatorv1al
 	if cluster.Spec.TalosManagementMode != operatorv1alpha1.TalosManagementUnmanaged {
 		// Reconcile talos-manager application:
 		if err := r.reconcileTalosManager(ctx, cluster); err != nil {
-			log.Error(err, "talos-manager reconciliation failed")
+			log.Error(err, "Failed to reconcile talos-manager Application")
 			reconcileErr = err
+		}
+
+		if cluster.Spec.Connection.Mode == operatorv1alpha1.ConnectionModeRemote {
+			// Generate cluster connection secret:
+			if err := r.generateConnectionSecret(ctx, cluster); err != nil {
+				log.Error(err, "Failed to create cluster connection secret")
+				reconcileErr = err
+			}
 		}
 	} else {
 		// We have to check if there is an existing talos-manager Application, because in that case, it should be deleted:

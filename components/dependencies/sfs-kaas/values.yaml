@@ -1,28 +1,42 @@
-# -- Superphénix organization to which this project belongs, must be a generated UUIDv4.
+# -- Superphenix organization to which this project belongs, must be a generated UUIDv4.
 # This ID must come from the SPX API, this parameter cannot be overriden by the user.
 # @section -- Organization parameters
 organizationID: "00000000-0000-0000-0000-000000000000"
-# -- Superphénix organization's friendly name.
+# -- Superphenix organization's friendly name.
 # This parameter cannot be overriden by the user.
 # @section -- Organization parameters
 organizationName: "null"
 
-# -- Superphénix project to which this project belongs, must be a project within the organization, must be a generated UUIDv4.
+# -- Superphenix project to which this project belongs, must be a project within the organization, must be a generated UUIDv4.
 # This ID must come from the SPX API, this parameter cannot be overriden by the user.
 # @section -- Organization parameters
 projectID: "00000000-0000-0000-0000-000000000000"
-# -- Superphénix project's friendly name.
+# -- Superphenix project's friendly name.
 # This ID must come from the SPX API, this parameter cannot be overriden by the user.
 # @section -- Organization parameters
 projectName: "null"
 
 # -- AZ in which we're deploying this chart.
 # This parameter cannot be overriden by the user.
+# @section -- Organization parameters
 location: ""
 
-# -- Whether this chart is deployed through GitOps or not
+# -- Mapping between user-friendly names of devices and their real names.
+# The mapping is specified for the current AZ, meaning that each AZ can have a different mapping.
 # This parameter cannot be overriden by the user.
+# @section -- Organization parameters
+deviceMapping: {}
+
+# -- Whether this chart is deployed through GitOps or not.
+# This parameter cannot be overriden by the user.
+# @section -- Organization parameters
 gitops: false
+
+# -- Mapping between user-friendly names of storage classes and their real names.
+# The mapping is specified for the current AZ, meaning that each AZ can have a different mapping.
+# This parameter cannot be overriden by the user.
+# @section -- Organization parameters
+storageClassMapping: {}
 
 # -- Per AZ mapping of URLs to use in cluster configuration
 # This parameter cannot be overriden by the user.
@@ -239,6 +253,18 @@ clusters: {}
   #             # @section -- Worker main disk
   #             imageUrl: ""
 
+  #           # -- GPU Passthrough configuration
+  #           # @section -- Worker VM template
+  #           # @default -- []
+  #           gpus:
+  #             - device: ""
+
+  #           # -- List of NTP server IPs or DNS names
+  #           # Uses systemd-timesyncd which implements SNTP
+  #           # @section -- Worker VM template
+  #           # @default -- []
+  #           ntpServers: []
+
   #           # -- Custom taints to be set on node creation
   #           # @section -- Worker VM template
   #           # @default -- []
@@ -404,5 +430,12 @@ kubevirtCsi:
     csiAttacherVersion: v4.12.0
     csiLivenessprobeVersion: v2.19.0
     csiResizerVersion: v2.2.1
+    csiSnapshotterVersion: v8.6.0
+    csiDriverVersion: latest
+  v1.37:
+    csiProvisionerVersion: v6.3.0
+    csiAttacherVersion: v4.13.0
+    csiLivenessprobeVersion: v2.20.0
+    csiResizerVersion: v2.3.0
     csiSnapshotterVersion: v8.6.0
     csiDriverVersion: latest

@@ -11,8 +11,7 @@
 {{- $kubeMinor := substr 1 5 $kubeVersion -}}
 {{- $fqdn := include "sfs-kaas.controlPlaneFqdn" (dict "root" $ "cluster" $cluster "clusterID" $clusterID) }}
 {{- $controlplaneUrl := printf "https://%s:%d" $fqdn (int $controlPlaneDefaults.network.apiServer.port) }}
-{{- /* repoUrl is documented per cluster (clusters.<cluster>.kaasEssentials.repoUrl); a top-level value is still honored. Nil-safe: neither key is required. */}}
-{{- $repoUrl := ($cluster.kaasEssentials).repoUrl | default ($.Values.kaasEssentials).repoUrl | default $.Values.clusterDefaults.kaasEssentials.chartUrl }}
+{{- $repoUrl := $cluster.kaasEssentials.repoUrl | default $.Values.clusterDefaults.kaasEssentials.chartUrl }}
 
 ---
 apiVersion: v1
@@ -99,6 +98,9 @@ data:
       name: {{ $cluster.name | quote }}
       kubeVersion: {{ $kubeVersion | quote }}
       controlplaneUrl: {{ $controlplaneUrl | quote }}
+      organizationID: {{ printf "spx-%s" (toString $.Values.organizationID) | quote }}
+      projectID: {{ printf "spx-%s" (toString $projectID) | quote }}
+      location: {{ $.Values.location | quote }}
 
     # Values from clusters.<cluster>.kaasEssentials.values are imported here
     {{- if hasKey $cluster.kaasEssentials "values" }}

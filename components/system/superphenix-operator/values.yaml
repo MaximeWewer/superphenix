@@ -25,16 +25,21 @@ leaderElection:
   # -- Enable leader election for the operator, necessary if running multiple replicas.
   enabled: true
 
-# -- Metrics and Health configuration.
+# -- Metrics configuration.
 metrics:
   # -- The address the metric endpoint binds to. Use "0" to disable.
   bindAddress: "0" # Disable by default
   # -- Whether to secure the metrics endpoint with TLS.
   secure: true
 
+# -- Health check configuration.
 health:
   # -- The address the health probe endpoint binds to.
   probeBindAddress: ":8081"
+
+# -- Network policy configuration.
+networkPolicy:
+  enabled: false
 
 image:
   # -- Repository for the operator image.
@@ -157,7 +162,7 @@ config:
 
   database:
     # -- Automatically connect to the default deployed PostgreSQL by probing the 'postgres' secret.
-    autoConnect: true
+    autoConnect: false
     # -- The host of the Superphenix Database.
     host: ""
     # -- The port of the Superphenix Database.
@@ -177,6 +182,54 @@ config:
       # -- Version of the talos-manager chart.
       version: 0.1.0
 
+# -- Superphenix toolbox configuration.
+# The toolbox is an optional standalone Deployment deployed alongside the operator.
+# It provides standard tooling (bash, jq, kubectl, helm, k9s, psql and more) and mounts the
+# kubeconfig of every cluster managed by the operator, allowing administrators
+# to access all clusters from a single container.
+toolbox:
+  # -- Enable the toolbox deployment. Disabled by default.
+  enabled: false
+
+  # -- Inject the database connection string as DATABASE_URL.
+  # When config.database.autoConnect is set, the value is the uri key of the postgres Secret.
+  # Otherwise it is built from config.database.
+  injectDatabaseCredentials: false
+
+  image:
+    # -- Repository for the toolbox image.
+    repository: ghcr.io/super-phenix/superphenix-toolbox
+    # -- Pull policy for the toolbox image.
+    pullPolicy: IfNotPresent
+    # -- Overrides the image tag whose default is the chart appVersion.
+    tag: ""
+
+  # -- Resource limits and requests for the toolbox container.
+  resources:
+    limits:
+      memory: 256Mi
+    requests:
+      cpu: 10m
+      memory: 64Mi
+
+  # -- Annotations for the toolbox pods.
+  podAnnotations: {}
+
+  # -- Secrets for pulling the toolbox image.
+  imagePullSecrets: []
+
+  # -- Pod-level security context for the toolbox.
+  podSecurityContext: {}
+  # -- Container-level security context for the toolbox.
+  securityContext: {}
+
+  # -- Node selector for toolbox pod assignment.
+  nodeSelector: {}
+  # -- Tolerations for toolbox pod assignment.
+  tolerations: []
+  # -- Affinity rules for toolbox pod assignment.
+  affinity: {}
+
 # -- Superphenix management cluster configuration.
 # This will create a Cluster resource for the management cluster, pointing to the Kubernetes cluster
 # where the operator is installed. Only management configuration can be defined here. If you also want
@@ -194,11 +247,11 @@ management:
 
   # -- Override the default Superphenix system chart location.
   # This is useful if you want to use a custom chart.
-  systemLocation:
+  systemLocation: {}
     # -- Override the default Superphenix system chart repository.
-    repoURL: ""
+    # repoURL: ""
     # -- Override the default Superphenix system chart name.
-    chartName: ""
+    # chartName: ""
   # -- Override the default Superphenix system chart version.
   # This is useful if you want to use a custom chart.
   version: ""

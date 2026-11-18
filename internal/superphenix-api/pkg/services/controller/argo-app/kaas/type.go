@@ -37,9 +37,10 @@ type DataStoreSpec struct {
 
 type Group struct {
 	Name         string        `json:"name" validate:"max=63"`
+	NodeRole     string        `json:"nodeRole,omitempty"`
 	Replicas     int           `json:"replicas"`
 	Cpu          int           `json:"cpu"`
-	Memory       int           `json:"memory"`
+	Memory       string        `json:"memory"`
 	BootDiskSize int           `json:"bootDiskSize"`
 	StorageClass string        `json:"storageClass"`
 	Subnets      []GroupSubnet `json:"subnets"`

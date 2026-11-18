@@ -51,10 +51,10 @@ data:
       --namespace kube-system \
       --kubeconfig /var/run/kubeconfig \
       --set-string controlPlane.fqdn="$KAAS_FQDN" \
-      --set controlPlane.network.apiServer.port={{ $controlPlaneDefaults.network.apiServer.port | quote }} \
-      --set controlPlane.network.apiServer.proxyPort={{ $controlPlaneDefaults.network.apiServer.proxyPort | quote }} \
+      --set controlPlane.network.apiServer.port={{ $controlPlaneDefaults.network.apiServer.port | int }} \
+      --set controlPlane.network.apiServer.proxyPort={{ $controlPlaneDefaults.network.apiServer.proxyPort | int }} \
       --set cilium.k8sServiceHost=10.96.0.1 \
-      --set cilium.k8sServicePort={{ $controlPlaneDefaults.network.apiServer.port | quote }} \
+      --set cilium.k8sServicePort={{ $controlPlaneDefaults.network.apiServer.port | int }} \
       -f /job/values/values.yaml
     if [ $? -eq 0 ]; then
       echo "[+] Helm upgrade successful."

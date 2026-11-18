@@ -1,10 +1,10 @@
 FROM alpine:3.21
 
 ARG KUBECTL_VERSION=v1.32.3
-ARG HELM_VERSION=v3.17.3
-ARG K9S_VERSION=v0.32.7
-ARG ARGOCD_VERSION=v2.14.4
-ARG VELERO_VERSION=v1.15.2
+ARG HELM_VERSION=v4.3.1
+ARG K9S_VERSION=v0.51.0
+ARG ARGOCD_VERSION=v3.6.1
+ARG VELERO_VERSION=v1.18.4
 ARG TARGETARCH
 
 RUN apk add --no-cache \
@@ -19,7 +19,8 @@ RUN apk add --no-cache \
     openssl \
     wget \
     tar \
-    gzip
+    gzip \
+    postgresql-client
 
 # Install kubectl
 RUN case "${TARGETARCH}" in \
@@ -69,10 +70,17 @@ RUN case "${TARGETARCH}" in \
     | tar -xz --strip-components=1 -C /usr/local/bin "velero-${VELERO_VERSION}-linux-${ARCH}/velero" \
     && chmod +x /usr/local/bin/velero
 
+# Ship the skin outside /root. The toolbox Deployment mounts an emptyDir
+# on /root, which would hide anything copied there. The entrypoint seeds
+# $HOME/.config/k9s from this directory on startup.
+COPY components/dependencies/superphenix-toolbox/docker/k9s/skin.yaml /usr/local/share/k9s/skins/superphenix.yaml
+COPY components/dependencies/superphenix-toolbox/docker/k9s/config.yaml /usr/local/share/k9s/config.yaml
+
 # Entrypoint script: symlinks the operator-managed aggregated kubeconfig into
 # ~/.kube/config so all tools pick it up automatically. The kubelet updates
 # the mounted Secret file in place when credentials are rotated.
 COPY components/dependencies/superphenix-toolbox/docker/toolbox-entrypoint.sh /usr/local/bin/toolbox-entrypoint.sh
-RUN chmod +x /usr/local/bin/toolbox-entrypoint.sh
+COPY hacks/users/users.sh /usr/local/bin/spx-users
+RUN chmod +x /usr/local/bin/toolbox-entrypoint.sh /usr/local/bin/spx-users
 
 ENTRYPOINT ["/bin/bash", "/usr/local/bin/toolbox-entrypoint.sh"]

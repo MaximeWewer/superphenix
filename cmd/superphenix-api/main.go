@@ -32,6 +32,7 @@ func main() {
 	app.StartGarbageCollection(ctx, &config.Global)
 	app.ReconcileAppProjects(ctx, &config.Global)
 	app.StartAuditLogGC(ctx, &config.Global)
+	app.StartQuotaResync(ctx, &config.Global)
 
 	api.StartAPI()
 }

@@ -66,6 +66,13 @@ func ReverseProxy(rawUrl, pattern string, authSecret string) (httputil.ReversePr
 		}}, nil
 }
 
+// stripPattern removes pattern from the escaped path and sets Path and RawPath from the result,                                                                                                                                                                                                                          
+// so an encoded "%2F" in a parameter stays encoded.
+func stripPattern(u *url.URL, pattern string) {
+	u.RawPath = strings.Replace(u.EscapedPath(), pattern, "", 1)
+	u.Path, _ = url.PathUnescape(u.RawPath) // EscapedPath always returns a valid escaping
+}
+
 // SendBatchProxy proxies a request to multiple targets, removing the pattern from the path if given.
 // targets: object AZ need at least code and url (others are optional)
 func SendBatchProxy(r *http.Request, targets []config.AZConfig, pattern string) (map[string]*http.Response, error) {
@@ -168,17 +175,6 @@ func RewriteRequest(r *http.Request, rawUrl, pattern string) error {
 	stripPattern(r.URL, pattern)
 	r.Host = target.Host // Change the initial host to the new one
 	return nil
-}
-
-// stripPattern removes pattern from both the decoded and the escaped path.
-// Rewriting only Path would leave a RawPath that no longer matches it: Go then
-// sends the decoded path, and encoded separators in a path parameter would turn
-// into real ones on the controller side.
-func stripPattern(u *url.URL, pattern string) {
-	u.Path = strings.Replace(u.Path, pattern, "", 1)
-	if u.RawPath != "" {
-		u.RawPath = strings.Replace(u.RawPath, pattern, "", 1)
-	}
 }
 
 // rewriteRequestURL override request url with target

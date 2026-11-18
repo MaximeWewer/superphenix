@@ -80,6 +80,7 @@ func LaunchEndpoint(address string) {
 		r.Get("/kaas-config", configApi.GetKaaSConfig)
 		r.Get("/s3-config", configApi.GetS3Config)
 		r.Get("/container-disks", configApi.GetContainerDiskCatalog)
+		r.Get("/gpu-class", configApi.GetGpuClass)
 
 		//// COMPUTE ////
 		kubevirt.VMEndpoint(r)
@@ -105,6 +106,7 @@ func LaunchEndpoint(address string) {
 
 		//// OTHERS ////
 		k8s.SSHEndpoint(r)
+		k8s.QuotaEndpoint(r)
 	})
 
 	// Webhook Server

@@ -1,5 +1,11 @@
 {{- if .Values.rbac.create -}}
-{{- $appProjectNamespace := .Values.rbac.appProjectNamespace | default .Release.Namespace }}
+{{- $config := .Values.config | default dict }}
+{{- $appProjectNamespace := .Values.rbac.appProjectNamespace | default (dig "argoController" "appProjectNamespace" "" $config) | default .Release.Namespace }}
+{{- $spxPrefix := (get $config "spxPrefix") | default "spx" }}
+{{- if not (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" $spxPrefix) }}
+{{- fail "config.spxPrefix must be a lowercase DNS label" }}
+{{- end }}
+{{- $prefix := printf "%s-" $spxPrefix }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -115,15 +121,15 @@ spec:
     - name: api-service-account
       expression: 'request.userInfo.username == "system:serviceaccount:{{ .Release.Namespace }}:{{ include "superphenix-api.serviceAccountName" . }}"'
   validations:
-    - expression: 'request.resource.resource != "applications" || request.namespace.startsWith("spx-")'
+    - expression: 'request.resource.resource != "applications" || request.namespace.startsWith("{{ $prefix }}")'
       message: "superphenix-api may only manage Applications in spx-* namespaces"
     - expression: 'request.resource.resource != "applications" || request.operation != "CREATE" || object.spec.project == request.namespace'
       message: "superphenix-api may only create Applications that use the AppProject of their namespace"
     - expression: 'request.resource.resource != "applications" || request.operation != "UPDATE" || object.spec.project == oldObject.spec.project'
       message: "superphenix-api may not change the AppProject of an Application"
-    - expression: 'request.resource.resource != "appprojects" || (request.namespace == "{{ $appProjectNamespace }}" && request.name.startsWith("spx-"))'
+    - expression: 'request.resource.resource != "appprojects" || (request.namespace == "{{ $appProjectNamespace }}" && request.name.startsWith("{{ $prefix }}"))'
       message: "superphenix-api may only manage AppProjects named spx-*"
-    - expression: 'request.resource.resource != "namespaces" || object.metadata.name.startsWith("spx-")'
+    - expression: 'request.resource.resource != "namespaces" || object.metadata.name.startsWith("{{ $prefix }}")'
       message: "superphenix-api may only create spx-* namespaces"
 ---
 apiVersion: admissionregistration.k8s.io/v1

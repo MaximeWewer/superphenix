@@ -16,12 +16,13 @@ rbac:
   # and AppProjects backing KaaS/BaaS, and create per-project namespaces.
   # Required unless the argoController features are unused.
   create: true
-  # -- Namespace holding the per-project AppProjects. Must match
-  # `config.argoController.appProjectNamespace`. Empty means the release namespace.
+  # -- Namespace holding the per-project AppProjects. Empty means
+  # `config.argoController.appProjectNamespace`, else the release namespace.
   appProjectNamespace: ""
   admissionPolicy:
     # -- Deny any Application, AppProject or namespace change by the API service
-    # account outside the per-project `spx-*` objects (requires Kubernetes 1.30+).
+    # account outside the per-project `spx-*` objects (prefix from
+  # `config.spxPrefix`; requires Kubernetes 1.30+).
     enabled: true
 
 serviceAccount:

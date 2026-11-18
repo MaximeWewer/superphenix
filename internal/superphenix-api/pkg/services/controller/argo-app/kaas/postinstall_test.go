@@ -76,7 +76,7 @@ func TestCreateKaaSAppValues_PostInstallChart(t *testing.T) {
 		StorageClasses: []ClassMapping{{Shortname: "sc1", Fullname: "storage-class-1"}},
 	}
 	group := Group{
-		Name: "group-1", Replicas: 1, Cpu: 2, Memory: 4, BootDiskSize: 20,
+		Name: "group-1", Replicas: 1, Cpu: 2, Memory: "4Gi", BootDiskSize: 20,
 		StorageClass: "sc1", Subnets: []GroupSubnet{{Order: 1, Id: "00000000-0000-4000-8000-000000000001"}},
 	}
 	specWith := func(pic PostInstallChartSpec) KaaSSpec {
